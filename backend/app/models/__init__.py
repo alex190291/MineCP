@@ -17,6 +17,7 @@ from app.models.backup import Backup
 from app.models.player import Player
 from app.models.audit_log import AuditLog
 from app.models.ldap_config import LDAPConfig
+from app.models.system_setup import SystemSetup
 
 __all__ = [
     'User',
@@ -25,5 +26,6 @@ __all__ = [
     'Backup',
     'Player',
     'AuditLog',
-    'LDAPConfig'
+    'LDAPConfig',
+    'SystemSetup'
 ]

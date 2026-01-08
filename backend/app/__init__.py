@@ -192,22 +192,47 @@ def register_error_handlers(app):
 
 
 def create_default_admin():
-    """Create default admin user if none exists."""
+    """
+    Create default admin user ONLY on first run.
+
+    SECURITY: This function only runs during initial setup to prevent
+    recreating the admin user with default credentials on every restart.
+    """
     from app.models.user import User
+    from app.models.system_setup import SystemSetup
     from flask import current_app
     from sqlalchemy.exc import OperationalError
 
     try:
-        if User.query.filter_by(username=current_app.config['DEFAULT_ADMIN_USERNAME']).first() is None:
-            admin = User(
-                username=current_app.config['DEFAULT_ADMIN_USERNAME'],
-                email=current_app.config['DEFAULT_ADMIN_EMAIL'],
-                role='admin',
-                is_ldap_user=False
-            )
-            admin.set_password(current_app.config['DEFAULT_ADMIN_PASSWORD'])
-            db.session.add(admin)
-            db.session.commit()
-            current_app.logger.info(f'Default admin user created: {admin.username}')
-    except OperationalError:
-        current_app.logger.warning('Database not initialized yet; skipping default admin creation')
+        # Only create admin user if this is the first run
+        if SystemSetup.is_first_run():
+            # Check if ANY admin user exists (not just the default one)
+            admin_exists = User.query.filter_by(role='admin').first() is not None
+
+            if not admin_exists:
+                # Create default admin user
+                admin = User(
+                    username=current_app.config['DEFAULT_ADMIN_USERNAME'],
+                    email=current_app.config['DEFAULT_ADMIN_EMAIL'],
+                    role='admin',
+                    is_ldap_user=False
+                )
+                admin.set_password(current_app.config['DEFAULT_ADMIN_PASSWORD'])
+                db.session.add(admin)
+                db.session.commit()
+                current_app.logger.info(f'Default admin user created: {admin.username}')
+
+            # Mark setup as complete
+            SystemSetup.mark_setup_complete()
+            current_app.logger.info('Initial system setup completed')
+        else:
+            current_app.logger.debug('Skipping admin creation - not first run')
+
+            # Security check: Warn if no admin users exist
+            admin_count = User.query.filter_by(role='admin').count()
+            if admin_count == 0:
+                current_app.logger.warning(
+                    'WARNING: No admin users exist! Create an admin user immediately.'
+                )
+    except OperationalError as e:
+        current_app.logger.warning(f'Database not initialized yet; skipping default admin creation: {e}')
