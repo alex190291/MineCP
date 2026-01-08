@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { RefreshCw } from 'lucide-react';
 
@@ -27,6 +27,7 @@ interface CreateServerFormData {
 
 export const CreateServer: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState('');
   const [availableVersions, setAvailableVersions] = useState<string[]>(MINECRAFT_VERSIONS);
   const [isFetchingVersions, setIsFetchingVersions] = useState(false);
@@ -50,6 +51,8 @@ export const CreateServer: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: CreateServerData) => serversAPI.create(data),
     onSuccess: (server) => {
+      // Invalidate servers list cache so dashboard updates
+      queryClient.invalidateQueries({ queryKey: ['servers'] });
       navigate(`/servers/${server.id}`);
     },
     onError: (error) => {
