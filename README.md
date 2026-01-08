@@ -34,13 +34,6 @@ Open http://localhost:5050
 
 Default login: `admin` / `changeme`
 
-## Documentation
-
-See `/docs` folder for detailed guides:
-- Quick Start Guide
-- Architecture Overview
-- Implementation Tracks
-
 ## License
 
 MIT License
