@@ -51,7 +51,6 @@ export const CreateServer: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: CreateServerData) => serversAPI.create(data),
     onSuccess: (server) => {
-      // Invalidate servers list cache so dashboard updates
       queryClient.invalidateQueries({ queryKey: ['servers'] });
       navigate(`/servers/${server.id}`);
     },

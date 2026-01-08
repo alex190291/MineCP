@@ -192,58 +192,39 @@ def register_error_handlers(app):
 
 
 def create_default_admin():
-    """
-    Create default admin user ONLY on first run.
-
-    SECURITY: This function only runs during initial setup to prevent
-    recreating the admin user with default credentials on every restart.
-    Handles race conditions when multiple workers start simultaneously.
-    """
+    """Create default admin user on first run only."""
     from app.models.user import User
     from app.models.system_setup import SystemSetup
     from flask import current_app
     from sqlalchemy.exc import OperationalError, IntegrityError
 
     try:
-        # Only create admin user if this is the first run
-        if SystemSetup.is_first_run():
-            # Check if ANY admin user exists (not just the default one)
-            admin_exists = User.query.filter_by(role='admin').first() is not None
+        if not SystemSetup.is_first_run():
+            if User.query.filter_by(role='admin').count() == 0:
+                current_app.logger.warning('No admin users exist')
+            return
 
-            if not admin_exists:
-                try:
-                    # Create default admin user
-                    admin = User(
-                        username=current_app.config['DEFAULT_ADMIN_USERNAME'],
-                        email=current_app.config['DEFAULT_ADMIN_EMAIL'],
-                        role='admin',
-                        is_ldap_user=False
-                    )
-                    admin.set_password(current_app.config['DEFAULT_ADMIN_PASSWORD'])
-                    db.session.add(admin)
-                    db.session.commit()
-                    current_app.logger.info(f'Default admin user created: {admin.username}')
-                except IntegrityError:
-                    # Race condition: Another worker already created the admin user
-                    db.session.rollback()
-                    current_app.logger.debug('Admin user already created by another worker')
+        if User.query.filter_by(role='admin').first():
+            SystemSetup.mark_setup_complete()
+            return
 
-            # Mark setup as complete
-            try:
-                SystemSetup.mark_setup_complete()
-                current_app.logger.info('Initial system setup completed')
-            except IntegrityError:
-                # Another worker already marked setup as complete
-                db.session.rollback()
-                current_app.logger.debug('Setup already marked complete by another worker')
-        else:
-            current_app.logger.debug('Skipping admin creation - not first run')
+        try:
+            admin = User(
+                username=current_app.config['DEFAULT_ADMIN_USERNAME'],
+                email=current_app.config['DEFAULT_ADMIN_EMAIL'],
+                role='admin',
+                is_ldap_user=False
+            )
+            admin.set_password(current_app.config['DEFAULT_ADMIN_PASSWORD'])
+            db.session.add(admin)
+            db.session.commit()
+            current_app.logger.info(f'Default admin user created: {admin.username}')
+        except IntegrityError:
+            db.session.rollback()
 
-            # Security check: Warn if no admin users exist
-            admin_count = User.query.filter_by(role='admin').count()
-            if admin_count == 0:
-                current_app.logger.warning(
-                    'WARNING: No admin users exist! Create an admin user immediately.'
-                )
-    except OperationalError as e:
-        current_app.logger.warning(f'Database not initialized yet; skipping default admin creation: {e}')
+        try:
+            SystemSetup.mark_setup_complete()
+        except IntegrityError:
+            db.session.rollback()
+    except OperationalError:
+        pass

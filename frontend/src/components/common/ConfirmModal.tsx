@@ -33,13 +33,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <GlassCard className="relative max-w-md w-full p-6 space-y-4">
         <div className="flex items-start justify-between">
           <h3 className="text-xl font-semibold text-white">{title}</h3>

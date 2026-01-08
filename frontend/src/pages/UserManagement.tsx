@@ -63,7 +63,7 @@ export const UserManagement: React.FC = () => {
       setIsCreating(false);
       reset();
     },
-    onError: (error: unknown) => {
+    onError: (error) => {
       if (axios.isAxiosError(error)) {
         setMessage(error.response?.data?.error || t('users.error.create'));
       } else {
@@ -83,7 +83,7 @@ export const UserManagement: React.FC = () => {
       setEditingUser(null);
       reset();
     },
-    onError: (error: unknown) => {
+    onError: (error) => {
       if (axios.isAxiosError(error)) {
         setMessage(error.response?.data?.error || t('users.error.update'));
       } else {
@@ -100,7 +100,7 @@ export const UserManagement: React.FC = () => {
       setMessage(t('users.success.deleted'));
       setMessageType('success');
     },
-    onError: (error: unknown) => {
+    onError: (error) => {
       if (axios.isAxiosError(error)) {
         setMessage(error.response?.data?.error || t('users.error.delete'));
       } else {
@@ -166,7 +166,6 @@ export const UserManagement: React.FC = () => {
     setMessage('');
 
     if (editingUser) {
-      // Update existing user (only if not LDAP user)
       if (editingUser.is_ldap_user) {
         setMessage('Cannot edit LDAP users');
         setMessageType('error');
@@ -186,7 +185,6 @@ export const UserManagement: React.FC = () => {
 
       updateMutation.mutate({ id: editingUser.id, data: updateData });
     } else {
-      // Create new user (always local, never LDAP)
       if (!data.password || !data.password.trim()) {
         setMessage(t('users.form.passwordRequired'));
         setMessageType('error');
@@ -198,7 +196,7 @@ export const UserManagement: React.FC = () => {
         email: data.email,
         role: data.role,
         password: data.password,
-        is_ldap_user: false, // Always create local users
+        is_ldap_user: false,
         is_active: data.is_active,
       };
 
