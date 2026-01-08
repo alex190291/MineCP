@@ -10,7 +10,7 @@ Web-based platform for managing multiple Minecraft servers with Docker container
 - **Server Configuration**: Visual editor for server.properties
 - **Backup System**: Create, download, and restore server backups
 - **Real-time Monitoring**: Live metrics and WebSocket updates
-- **User Management**: JWT authentication with role-based access
+- **User Management**: JWT or LDAP based authentication with role-based access
 
 ## Tech Stack
 
