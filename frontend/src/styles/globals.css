@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-transparent;
+  }
+
+  body {
+    @apply text-white min-h-screen;
+    @apply font-sans antialiased;
+    background: linear-gradient(-45deg, #1e293b, #1e3a8a, #312e81, #1e293b);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+  }
+
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+    }
+    25% {
+      transform: translateY(-20px) translateX(10px);
+    }
+    50% {
+      transform: translateY(-40px) translateX(-10px);
+    }
+    75% {
+      transform: translateY(-20px) translateX(10px);
+    }
+  }
+
+  @keyframes float-medium {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+    }
+    33% {
+      transform: translateY(-30px) translateX(-15px);
+    }
+    66% {
+      transform: translateY(-15px) translateX(15px);
+    }
+  }
+
+  @keyframes float-fast {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+    }
+    50% {
+      transform: translateY(-25px) translateX(12px);
+    }
+  }
+
+  @keyframes rotate-slow {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes rotate-slow-reverse {
+    0% {
+      transform: rotate(360deg);
+    }
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 0.1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.15;
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes ping-slow {
+    0% {
+      transform: scale(1);
+      opacity: 0.2;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 0.1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0.2;
+    }
+  }
+
+  .animate-float-slow {
+    animation: float-slow 20s ease-in-out infinite;
+  }
+
+  .animate-float-medium {
+    animation: float-medium 15s ease-in-out infinite;
+  }
+
+  .animate-float-fast {
+    animation: float-fast 10s ease-in-out infinite;
+  }
+
+  .animate-rotate-slow {
+    animation: rotate-slow 30s linear infinite;
+  }
+
+  .animate-rotate-slow-reverse {
+    animation: rotate-slow-reverse 25s linear infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 8s ease-in-out infinite;
+  }
+
+  .animate-ping-slow {
+    animation: ping-slow 6s ease-in-out infinite;
+  }
+
+  .delay-1000 {
+    animation-delay: 1s;
+  }
+
+  .delay-2000 {
+    animation-delay: 2s;
+  }
+}
+
+@layer components {
+  /* Glassmorphism 2.0 Base */
+  .glass {
+    @apply bg-white/5;
+    @apply backdrop-blur-xl backdrop-saturate-150;
+    @apply border border-white/10;
+    @apply shadow-2xl shadow-black/50;
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  .glass-hover {
+    @apply hover:bg-white/10 hover:border-white/20;
+    @apply hover:-translate-y-0.5;
+    @apply hover:shadow-[0_6px_12px_rgba(0,0,0,0.5)];
+    @apply cursor-pointer;
+  }
+
+  /* Enhanced card hover effect for all glass cards */
+  .glass:hover {
+    @apply backdrop-blur-2xl;
+  }
+
+  /* Status Colors */
+  .status-running {
+    @apply bg-green-500/20 text-green-400 border-green-500/30;
+  }
+
+  .status-stopped {
+    @apply bg-gray-500/20 text-gray-400 border-gray-500/30;
+  }
+
+  .status-starting {
+    @apply bg-amber-500/20 text-amber-400 border-amber-500/30;
+  }
+
+  .status-stopping {
+    @apply bg-orange-500/20 text-orange-400 border-orange-500/30;
+  }
+
+  .status-error {
+    @apply bg-red-500/20 text-red-400 border-red-500/30;
+  }
+}
+
+@layer utilities {
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-white/5 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/20 rounded-full;
+    @apply hover:bg-white/30;
+  }
+
+  /* Text gradients */
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-400 to-purple-400;
+    @apply bg-clip-text text-transparent;
+  }
+}
