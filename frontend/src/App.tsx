@@ -8,6 +8,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
 import { ServerDetails } from '@/pages/ServerDetails';
 import { CreateServer } from '@/pages/CreateServer';
+import { UserManagement } from '@/pages/UserManagement';
 import { Settings } from '@/pages/Settings';
 import { loadSavedColorPreset } from '@/utils/colorPresets';
 import { BackgroundAnimation } from '@/components/common/BackgroundAnimation';
@@ -40,6 +41,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="servers/new" element={<CreateServer />} />
           <Route path="servers/:id" element={<ServerDetails />} />
+          <Route path="users" element={<UserManagement />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

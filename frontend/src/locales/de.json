@@ -20,6 +20,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "createServer": "Server Erstellen",
+    "users": "Benutzer",
     "settings": "Einstellungen",
     "collapseSidebar": "Seitenleiste einklappen",
     "expandSidebar": "Seitenleiste ausklappen"

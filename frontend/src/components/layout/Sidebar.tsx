@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Settings, Menu } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, Settings, Menu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/utils/cn';
@@ -10,6 +10,7 @@ import { GlassCard } from '@/components/common/GlassCard';
 const navItems = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
   { to: '/servers/new', labelKey: 'nav.createServer', icon: PlusCircle },
+  { to: '/users', labelKey: 'nav.users', icon: Users },
   { to: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
 

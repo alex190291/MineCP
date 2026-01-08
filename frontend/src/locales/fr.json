@@ -20,6 +20,7 @@
   "nav": {
     "dashboard": "Tableau de Bord",
     "createServer": "Créer un Serveur",
+    "users": "Utilisateurs",
     "settings": "Paramètres",
     "collapseSidebar": "Réduire la barre latérale",
     "expandSidebar": "Étendre la barre latérale"

@@ -20,6 +20,7 @@
   "nav": {
     "dashboard": "Panel",
     "createServer": "Crear Servidor",
+    "users": "Usuarios",
     "settings": "Configuración",
     "collapseSidebar": "Contraer barra lateral",
     "expandSidebar": "Expandir barra lateral"

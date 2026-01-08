@@ -20,6 +20,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "createServer": "Create Server",
+    "users": "Users",
     "settings": "Settings",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar"
@@ -334,5 +335,53 @@
     },
     "compressed": "Compressed",
     "restoreSuccess": "Backup restored successfully! Start the server to see changes."
+  },
+  "users": {
+    "title": "User Management",
+    "subtitle": "Manage system users and permissions",
+    "createUser": "Create User",
+    "allUsers": "All Users",
+    "noUsers": "No Users",
+    "noUsersDesc": "Create your first user to get started",
+    "username": "Username",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "type": "Type",
+    "created": "Created",
+    "lastLogin": "Last Login",
+    "actions": "Actions",
+    "active": "Active",
+    "inactive": "Inactive",
+    "ldapUser": "LDAP",
+    "localUser": "Local",
+    "admin": "Admin",
+    "user": "User",
+    "neverLoggedIn": "Never",
+    "createNewUser": "Create New User",
+    "editUser": "Edit User",
+    "password": "Password",
+    "passwordOptional": "Password (leave empty to keep current)",
+    "passwordRequired": "Password (required for local users)",
+    "confirmDelete": "Delete user \"{{username}}\"? This action cannot be undone.",
+    "cannotDeleteSelf": "Cannot delete your own account",
+    "form": {
+      "usernameRequired": "Username is required",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Invalid email address",
+      "passwordRequired": "Password is required for local users",
+      "roleRequired": "Role is required"
+    },
+    "success": {
+      "created": "User created successfully",
+      "updated": "User updated successfully",
+      "deleted": "User deleted successfully"
+    },
+    "error": {
+      "create": "Failed to create user",
+      "update": "Failed to update user",
+      "delete": "Failed to delete user",
+      "load": "Failed to load users"
+    }
   }
 }
