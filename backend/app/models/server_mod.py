@@ -39,6 +39,13 @@ class ServerMod(db.Model):
         except (OSError, IOError):
             file_size = 0
 
+        mod_type = 'mod'
+        file_path = self.file_path or ''
+        if self.source == 'spigotmc':
+            mod_type = 'plugin'
+        elif '/plugins/' in file_path.replace('\\', '/'):
+            mod_type = 'plugin'
+
         return {
             'id': self.id,
             'server_id': self.server_id,
@@ -49,6 +56,7 @@ class ServerMod(db.Model):
             'file_name': self.file_name,
             'file_path': self.file_path,
             'file_size': file_size,
+            'content_type': mod_type,
             'enabled': self.enabled,
             'created_at': self.installed_at.isoformat()
         }

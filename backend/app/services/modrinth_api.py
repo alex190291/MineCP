@@ -20,6 +20,7 @@ class ModrinthAPI:
 
     def search_mods(self, query: str, minecraft_version: Optional[str] = None,
                    loader: Optional[str] = None, limit: int = 20,
+                   project_types: Optional[List[str]] = None,
                    server_side_only: bool = False) -> List[Dict]:
         """
         Search for mods on Modrinth.
@@ -54,10 +55,12 @@ class ModrinthAPI:
             else:
                 facets.append(f'["categories:{loader}"]')
 
-        # Filter for server-side mods only
+        if project_types:
+            type_facets = ','.join([f'"project_type:{project_type}"' for project_type in project_types])
+            facets.append(f'[{type_facets}]')
+
+        # Filter for server-side compatible results only
         if server_side_only:
-            facets.append('["project_type:mod"]')
-            # Include mods that work on server side (required or optional)
             facets.append('["server_side:required","server_side:optional"]')
 
         if facets:
@@ -76,6 +79,7 @@ class ModrinthAPI:
                 'author': hit.get('author'),
                 'downloads': hit['downloads'],
                 'icon_url': hit.get('icon_url'),
+                'project_type': hit.get('project_type'),
                 'categories': hit.get('categories', []),
             } for hit in data.get('hits', [])]
 

@@ -10,18 +10,22 @@ export interface Mod {
   file_name: string;
   file_path: string;
   file_size: number;
+  content_type: 'mod' | 'plugin';
   enabled: boolean;
   created_at: string;
 }
 
 export interface ModSearchResult {
   project_id: string;
-  slug: string;
+  slug?: string;
   title: string;
   description: string;
   icon_url?: string;
   downloads: number;
   categories: string[];
+  source: 'modrinth' | 'spigotmc';
+  content_type: 'mod' | 'plugin';
+  url?: string;
 }
 
 export const modsAPI = {

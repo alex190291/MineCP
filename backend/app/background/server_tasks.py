@@ -85,7 +85,12 @@ def download_mod_async(server_id: str, mod_url: str, mod_name: str):
                 return
 
             # Download file
-            response = requests.get(mod_url, stream=True, timeout=300)
+            response = requests.get(
+                mod_url,
+                stream=True,
+                timeout=300,
+                headers={'User-Agent': 'MineCP/1.0'},
+            )
             response.raise_for_status()
 
             # Save to server mods directory

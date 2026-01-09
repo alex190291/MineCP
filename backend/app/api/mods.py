@@ -15,6 +15,7 @@ from app.models.server import Server
 from app.models.server_mod import ServerMod
 from app.models.user import User
 from app.services.modrinth_api import ModrinthAPI
+from app.services.spigot_api import SpigotAPI
 from app.background.task_queue import get_task_queue
 from app.background.server_tasks import download_mod_async
 
@@ -77,7 +78,7 @@ def _parse_spigot_resource(mod_url: str):
 @bp.route('/mods/search', methods=['GET'])
 @jwt_required()
 def search_mods():
-    """Search mods via Modrinth."""
+    """Search mods/plugins via Modrinth and SpigotMC."""
     query = request.args.get('query') or request.args.get('q')
     minecraft_version = request.args.get('version')
     loader = request.args.get('loader')
@@ -87,12 +88,45 @@ def search_mods():
     if not query:
         return jsonify({'error': 'query parameter required'}), 400
 
+    normalized_server_type = (server_type or '').lower()
+    plugin_servers = {'paper', 'spigot', 'purpur'}
+
     # Map server type to Modrinth loader/category if provided
     if server_type and not loader:
         loader = _map_server_type_to_loader(server_type)
 
-    api = ModrinthAPI()
-    results = api.search_mods(query, minecraft_version, loader, limit=limit, server_side_only=True)
+    project_types = ['plugin'] if normalized_server_type in plugin_servers else ['mod']
+    server_side_only = normalized_server_type not in plugin_servers
+
+    modrinth_api = ModrinthAPI()
+    modrinth_results = modrinth_api.search_mods(
+        query,
+        minecraft_version,
+        loader,
+        limit=limit,
+        project_types=project_types,
+        server_side_only=server_side_only,
+    )
+
+    results = []
+    for result in modrinth_results:
+        content_type = result.get('project_type') or project_types[0]
+        results.append({
+            **result,
+            'source': 'modrinth',
+            'content_type': content_type,
+        })
+
+    if normalized_server_type in plugin_servers:
+        spigot_api = SpigotAPI()
+        spigot_results = spigot_api.search_resources(query, limit=limit)
+        for result in spigot_results:
+            results.append({
+                **result,
+                'source': 'spigotmc',
+                'content_type': 'plugin',
+            })
+
     return jsonify({'results': results}), 200
 
 
@@ -197,10 +231,15 @@ def install_mod(server_id):
     data = request.get_json() or {}
     mod_name = data.get('mod_name')
     mod_url = data.get('mod_url')
-    source = data.get('source', 'modrinth')
+    source = (data.get('source') or 'modrinth').lower()
     source_id = data.get('source_id')
     minecraft_version = data.get('version') or server.version
     upload_path = data.get('file_path')
+
+    if source in {'spigot', 'spigotmc.org'}:
+        source = 'spigotmc'
+    if mod_url and 'spigotmc.org' in mod_url.lower():
+        source = 'spigotmc'
 
     mods_dir = _get_server_mods_dir(server)
     mods_dir.mkdir(parents=True, exist_ok=True)
@@ -279,8 +318,10 @@ def install_mod(server_id):
         download_url = latest_version['files'][0]['url']
         filename = latest_version['files'][0]['filename']
 
-    elif source == 'spigotmc' and mod_url:
-        resource_id, slug = _parse_spigot_resource(mod_url)
+    elif source == 'spigotmc':
+        resource_id, slug = _parse_spigot_resource(mod_url or '') if mod_url else (None, None)
+        if not resource_id and source_id:
+            resource_id = str(source_id)
         if not resource_id:
             return jsonify({'error': 'Invalid SpigotMC resource URL'}), 400
 

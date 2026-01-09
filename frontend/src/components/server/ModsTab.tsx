@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/common/GlassCard';
 import { GlassButton } from '@/components/common/GlassButton';
 import { GlassInput } from '@/components/common/GlassInput';
 import { formatBytes, formatRelativeTime } from '@/utils/formatters';
+import type { ModSearchResult } from '@/api/mods';
 
 interface ModsTabProps {
   serverId: string;
@@ -36,6 +37,19 @@ const getModSourceFromUrl = (url: string) => {
     return 'spigotmc';
   }
   return 'curseforge';
+};
+
+const getSearchResultUrl = (result: ModSearchResult) => {
+  if (result.url) {
+    return result.url;
+  }
+
+  if (result.source === 'modrinth' && result.slug) {
+    const typePath = result.content_type === 'plugin' ? 'plugin' : 'mod';
+    return `https://modrinth.com/${typePath}/${result.slug}`;
+  }
+
+  return '';
 };
 
 export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
@@ -184,40 +198,48 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
 
             {searchResults && searchResults.length > 0 && (
               <div className="mt-3 space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                {searchResults.map((result) => (
-                  <div
-                    key={result.project_id}
-                    className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors flex items-start justify-between"
-                  >
-                    <div className="flex-1">
-                      <h4 className="font-semibold">{result.title}</h4>
-                      <p className="text-xs text-white/60 mt-1 line-clamp-2">
-                        {result.description}
-                      </p>
-                      <p className="text-xs text-white/40 mt-1">
-                        {result.downloads.toLocaleString()} {t('mods.downloads')}
-                      </p>
+                {searchResults.map((result) => {
+                  const resultUrl = getSearchResultUrl(result);
+                  const typeLabel =
+                    result.content_type === 'plugin'
+                      ? t('mods.type.plugin')
+                      : t('mods.type.mod');
+
+                  return (
+                    <div
+                      key={result.project_id}
+                      className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors flex items-start justify-between"
+                    >
+                      <div className="flex-1">
+                        <h4 className="font-semibold">{result.title}</h4>
+                        <p className="text-xs text-white/60 mt-1 line-clamp-2">
+                          {result.description}
+                        </p>
+                        <p className="text-xs text-white/40 mt-1">
+                          {typeLabel} • {result.downloads.toLocaleString()} {t('mods.downloads')}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <GlassButton
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => window.open(resultUrl, '_blank')}
+                          title={t('mods.show')}
+                          disabled={!resultUrl}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </GlassButton>
+                        <GlassButton
+                          size="sm"
+                          onClick={() => setModrinthUrl(resultUrl)}
+                          disabled={!resultUrl}
+                        >
+                          {t('mods.select')}
+                        </GlassButton>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <GlassButton
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => window.open(`https://modrinth.com/mod/${result.slug}`, '_blank')}
-                        title={t('mods.show')}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </GlassButton>
-                      <GlassButton
-                        size="sm"
-                        onClick={() =>
-                          setModrinthUrl(`https://modrinth.com/mod/${result.slug}`)
-                        }
-                      >
-                        {t('mods.select')}
-                      </GlassButton>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -247,6 +269,11 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
                     <h4 className="font-semibold">{mod.name}</h4>
                     <div className="flex gap-3 text-xs text-white/60 mt-1">
                       {mod.version && <span>v{mod.version}</span>}
+                      <span>
+                        {mod.content_type === 'plugin'
+                          ? t('mods.type.plugin')
+                          : t('mods.type.mod')}
+                      </span>
                       <span>{mod.source}</span>
                       {mod.file_size > 0 && <span>{formatBytes(mod.file_size)}</span>}
                       <span>{formatRelativeTime(mod.created_at)}</span>

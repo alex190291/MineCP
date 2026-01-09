@@ -269,6 +269,12 @@ def get_server_logs(server_id):
     docker_manager = DockerManager()
     logs = docker_manager.get_container_logs(server.container_id, tail=tail)
 
+    if logs:
+        logs = '\n'.join(
+            line for line in logs.splitlines()
+            if 'Thread RCON Client' not in line
+        )
+
     return jsonify({'logs': logs or ''}), 200
 
 
