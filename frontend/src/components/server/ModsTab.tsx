@@ -14,6 +14,30 @@ interface ModsTabProps {
   serverId: string;
 }
 
+const getModNameFromUrl = (url: string) => {
+  const cleaned = url.split('?')[0].replace(/\/+$/, '');
+  const parts = cleaned.split('/').filter(Boolean);
+  let lastPart = parts[parts.length - 1] || 'mod';
+
+  if (lastPart === 'download' && parts.length > 1) {
+    lastPart = parts[parts.length - 2];
+  }
+
+  const name = lastPart.replace(/\.jar$/i, '');
+  return name || 'mod';
+};
+
+const getModSourceFromUrl = (url: string) => {
+  const lowered = url.toLowerCase();
+  if (lowered.includes('modrinth.com')) {
+    return 'modrinth';
+  }
+  if (lowered.includes('spigotmc.org')) {
+    return 'spigotmc';
+  }
+  return 'curseforge';
+};
+
 export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -62,12 +86,12 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
 
   const downloadModMutation = useMutation({
     mutationFn: (url: string) => {
-      // Extract mod info from Modrinth/CurseForge URL
-      const modName = url.split('/').pop() || 'mod';
+      // Extract mod info from Modrinth/CurseForge/SpigotMC URL
+      const modName = getModNameFromUrl(url);
       return modsAPI.installMod(serverId, {
         mod_name: modName,
         mod_url: url,
-        source: url.includes('modrinth') ? 'modrinth' : 'curseforge',
+        source: getModSourceFromUrl(url),
       });
     },
     onSuccess: () => {

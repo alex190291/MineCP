@@ -79,12 +79,21 @@ def download_mod_async(server_id: str, mod_url: str, mod_name: str):
     with app.app_context():
         file_path = None
         try:
+            server = Server.query.get(server_id)
+            if not server:
+                current_app.logger.error(f"Server {server_id} not found for mod download")
+                return
+
             # Download file
             response = requests.get(mod_url, stream=True, timeout=300)
             response.raise_for_status()
 
             # Save to server mods directory
-            mods_dir = current_app.config['MC_SERVER_DATA_DIR'] / server_id / 'data' / 'mods'
+            data_dir = current_app.config['MC_SERVER_DATA_DIR'] / server_id / 'data'
+            if server.type and server.type.lower() in {'paper', 'spigot', 'purpur'}:
+                mods_dir = data_dir / 'plugins'
+            else:
+                mods_dir = data_dir / 'mods'
             mods_dir.mkdir(parents=True, exist_ok=True)
 
             file_path = mods_dir / f"{mod_name}.jar"

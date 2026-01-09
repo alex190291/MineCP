@@ -193,8 +193,8 @@
     "uploadMod": "Upload Mod",
     "uploadFile": "Upload Mod File",
     "uploading": "Uploading...",
-    "downloadFromModrinth": "Download from Modrinth/CurseForge",
-    "downloadUrlPlaceholder": "Paste mod download URL...",
+    "downloadFromModrinth": "Download from Modrinth/CurseForge/SpigotMC",
+    "downloadUrlPlaceholder": "Paste mod download URL (Modrinth, CurseForge, SpigotMC)...",
     "addFromModrinth": "Add from Modrinth",
     "modrinthUrl": "Modrinth URL or Slug",
     "modrinthPlaceholder": "e.g., fabric-api or https://modrinth.com/mod/fabric-api"

@@ -150,8 +150,8 @@
     "uploadMod": "Carica Mod",
     "uploadFile": "Carica File Mod",
     "uploading": "Caricamento...",
-    "downloadFromModrinth": "Scarica da Modrinth/CurseForge",
-    "downloadUrlPlaceholder": "Incolla URL di download mod...",
+    "downloadFromModrinth": "Scarica da Modrinth/CurseForge/SpigotMC",
+    "downloadUrlPlaceholder": "Incolla URL di download mod (Modrinth, CurseForge, SpigotMC)...",
     "addFromModrinth": "Aggiungi da Modrinth",
     "modrinthUrl": "URL o Slug Modrinth",
     "modrinthPlaceholder": "es. fabric-api o https://modrinth.com/mod/fabric-api"

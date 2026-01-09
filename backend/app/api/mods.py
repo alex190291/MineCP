@@ -1,8 +1,11 @@
 """
 Mod/Plugin management API endpoints.
 """
+import re
 import shutil
 from pathlib import Path
+from urllib.parse import urlparse
+
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
@@ -25,6 +28,50 @@ def _require_server_access(user: User, server: Server):
     if user and user.role != 'admin' and server.created_by != user.id:
         return jsonify({'error': 'Forbidden'}), 403
     return None
+
+
+def _get_server_mods_dir(server: Server) -> Path:
+    data_dir = current_app.config['MC_SERVER_DATA_DIR'] / server.id / 'data'
+    if server.type and server.type.lower() in {'paper', 'spigot', 'purpur'}:
+        return data_dir / 'plugins'
+    return data_dir / 'mods'
+
+
+def _parse_spigot_resource(mod_url: str):
+    if not mod_url:
+        return None, None
+
+    url = mod_url.strip()
+    if url.isdigit():
+        return url, None
+
+    if 'spigotmc.org' not in url:
+        return None, None
+
+    parsed = urlparse(url if '://' in url else f'https://{url}')
+    path = parsed.path or ''
+    if '/resources/' not in path:
+        return None, None
+
+    segment = path.split('/resources/', 1)[1].split('/', 1)[0]
+    resource_id = None
+    slug = None
+
+    if segment:
+        if '.' in segment:
+            slug_candidate, id_candidate = segment.rsplit('.', 1)
+            if id_candidate.isdigit():
+                resource_id = id_candidate
+                slug = slug_candidate or None
+        elif segment.isdigit():
+            resource_id = segment
+
+    if not resource_id:
+        match = re.search(r'/resources/(?:[^/]*\.)?(\d+)', path)
+        if match:
+            resource_id = match.group(1)
+
+    return resource_id, slug
 
 
 @bp.route('/mods/search', methods=['GET'])
@@ -155,7 +202,7 @@ def install_mod(server_id):
     minecraft_version = data.get('version') or server.version
     upload_path = data.get('file_path')
 
-    mods_dir = current_app.config['MC_SERVER_DATA_DIR'] / server.id / 'data' / 'mods'
+    mods_dir = _get_server_mods_dir(server)
     mods_dir.mkdir(parents=True, exist_ok=True)
 
     # Handle file upload
@@ -232,6 +279,15 @@ def install_mod(server_id):
         download_url = latest_version['files'][0]['url']
         filename = latest_version['files'][0]['filename']
 
+    elif source == 'spigotmc' and mod_url:
+        resource_id, slug = _parse_spigot_resource(mod_url)
+        if not resource_id:
+            return jsonify({'error': 'Invalid SpigotMC resource URL'}), 400
+
+        download_url = f"https://api.spiget.org/v2/resources/{resource_id}/download"
+        mod_name = mod_name or slug or f"spigot-{resource_id}"
+        filename = f"{mod_name}.jar"
+        slug = resource_id
     elif mod_url:
         # Direct download URL provided
         download_url = mod_url

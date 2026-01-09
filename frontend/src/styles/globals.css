@@ -36,7 +36,7 @@
         var(--primary) 50%,
         rgba(35, 70, 62, 0.9) 100%
     );
-    --dropdown-bg: #222222;
+    --dropdown-bg: rgba(0, 0, 0, 0.95);
     --dropdown-text: #ffffff;
     --border-color: rgba(255, 255, 255, 0.1);
     --border-active: var(--primary);
@@ -251,51 +251,51 @@
   }
 
   .animate-bubble-1 {
-    animation: bubble-rise-1 55s linear infinite;
+    animation: bubble-rise-1 55s linear infinite backwards;
   }
 
   .animate-bubble-2 {
-    animation: bubble-rise-2 68s linear infinite 8s;
+    animation: bubble-rise-2 68s linear infinite 8s backwards;
   }
 
   .animate-bubble-3 {
-    animation: bubble-rise-3 48s linear infinite 15s;
+    animation: bubble-rise-3 48s linear infinite 15s backwards;
   }
 
   .animate-bubble-4 {
-    animation: bubble-rise-4 72s linear infinite 22s;
+    animation: bubble-rise-4 72s linear infinite 22s backwards;
   }
 
   .animate-bubble-5 {
-    animation: bubble-rise-5 60s linear infinite 30s;
+    animation: bubble-rise-5 60s linear infinite 30s backwards;
   }
 
   .animate-bubble-6 {
-    animation: bubble-rise-6 65s linear infinite 5s;
+    animation: bubble-rise-6 65s linear infinite 5s backwards;
   }
 
   .animate-bubble-7 {
-    animation: bubble-rise-1 58s linear infinite 38s;
+    animation: bubble-rise-1 58s linear infinite 38s backwards;
   }
 
   .animate-bubble-8 {
-    animation: bubble-rise-3 63s linear infinite 12s;
+    animation: bubble-rise-3 63s linear infinite 12s backwards;
   }
 
   .animate-bubble-9 {
-    animation: bubble-rise-2 52s linear infinite 25s;
+    animation: bubble-rise-2 52s linear infinite 25s backwards;
   }
 
   .animate-bubble-10 {
-    animation: bubble-rise-4 70s linear infinite 18s;
+    animation: bubble-rise-4 70s linear infinite 18s backwards;
   }
 
   .animate-bubble-11 {
-    animation: bubble-rise-5 56s linear infinite 35s;
+    animation: bubble-rise-5 56s linear infinite 35s backwards;
   }
 
   .animate-bubble-12 {
-    animation: bubble-rise-6 62s linear infinite 42s;
+    animation: bubble-rise-6 62s linear infinite 42s backwards;
   }
 }
 

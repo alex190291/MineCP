@@ -43,7 +43,11 @@ def cleanup_corrupted_mods():
         for server in servers:
             print(f"\nChecking server: {server.name} ({server.id})")
 
-            mods_dir = Path(app.config['MC_SERVER_DATA_DIR']) / server.id / 'data' / 'mods'
+            data_dir = Path(app.config['MC_SERVER_DATA_DIR']) / server.id / 'data'
+            if server.type and server.type.lower() in {'paper', 'spigot', 'purpur'}:
+                mods_dir = data_dir / 'plugins'
+            else:
+                mods_dir = data_dir / 'mods'
 
             if not mods_dir.exists():
                 print(f"  No mods directory found")

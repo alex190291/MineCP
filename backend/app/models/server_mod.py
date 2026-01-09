@@ -15,7 +15,7 @@ class ServerMod(db.Model):
 
     # Mod information
     name = db.Column(db.String(200), nullable=False)
-    source = db.Column(db.String(20), nullable=False)  # upload, modrinth, curseforge
+    source = db.Column(db.String(20), nullable=False)  # upload, modrinth, curseforge, spigotmc
     source_id = db.Column(db.String(100), nullable=True)  # External ID
     version = db.Column(db.String(50), nullable=True)
 
