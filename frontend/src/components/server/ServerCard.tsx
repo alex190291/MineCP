@@ -48,7 +48,6 @@ export const ServerCard: React.FC<ServerCardProps> = ({ server }) => {
 
   return (
     <GlassCard
-      hover
       onClick={() => navigate(`/servers/${server.id}`)}
     >
       <div className="space-y-4">

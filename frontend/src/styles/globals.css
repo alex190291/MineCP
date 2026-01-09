@@ -3,167 +3,400 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    color-scheme: light dark;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Dark Mode Variables */
+    --bg-color: #000000;
+    --glass: rgba(0, 0, 0, 0.1);
+    --primary: #2d5a4f;
+    --primary-rgb: 45, 90, 79;
+    --text: #ffffff;
+    --text-translucent: rgba(255, 255, 255, 0.7);
+    --bg-dark: #000000;
+    --bg-dark-rgb: 0, 0, 0;
+    --card-bg: rgba(0, 0, 0, 0.2);
+    --card-bg-hover: rgba(0, 0, 0, 0.8);
+    --card-header-bg: transparent;
+    --glass-gradient: linear-gradient(
+        135deg,
+        rgba(0, 0, 0, 0.01),
+        rgba(0, 0, 0, 0.05)
+    );
+    --primary-gradient: linear-gradient(
+        135deg,
+        rgba(127, 127, 127, 0.7) 0%,
+        var(--primary) 50%,
+        rgba(35, 70, 62, 0.9) 100%
+    );
+    --dropdown-bg: #222222;
+    --dropdown-text: #ffffff;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --border-active: var(--primary);
+    --shadow-color: rgba(255, 255, 255, 0.15);
+    --focus-ring-color: rgba(var(--primary-rgb), 0.5);
+    --success-color: #27ae60;
+    --success-rgb: 39, 174, 96;
+    --warning-color: #f39c12;
+    --warning-rgb: 243, 156, 18;
+    --error-color: #e74c3c;
+    --danger: #dc3545;
+    --danger-rgb: 220, 53, 69;
+    --info-color: #3498db;
+    --info-rgb: 52, 152, 219;
+    --text-translucent-rgb: 255, 255, 255;
+  }
+
   * {
-    @apply border-transparent;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary) var(--bg-color);
   }
 
   body {
     @apply text-white min-h-screen;
     @apply font-sans antialiased;
-    background: linear-gradient(-45deg, #1e293b, #1e3a8a, #312e81, #1e293b);
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
+    display: flex;
+    flex-direction: column;
+    font-family: "Inter", sans-serif;
+    background: var(--bg-color);
+    color: var(--text);
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+    transition: background 0.3s, color 0.3s;
+    line-height: 1.5;
+    margin: 0;
+    min-width: 320px;
   }
 
-  @keyframes gradientShift {
-    0% {
-      background-position: 0% 50%;
+  h1 {
+    font-size: 3rem;
+    margin-bottom: 3rem;
+    line-height: 1.1;
+    z-index: 20;
+  }
+
+  /* Slow size change animations with different durations */
+  @keyframes size-pulse {
+    0%, 100% {
+      transform: scale(0.7);
     }
     50% {
-      background-position: 100% 50%;
-    }
-    100% {
-      background-position: 0% 50%;
+      transform: scale(1.4);
     }
   }
 
-  @keyframes float-slow {
-    0%, 100% {
-      transform: translateY(0) translateX(0);
-    }
-    25% {
-      transform: translateY(-20px) translateX(10px);
-    }
-    50% {
-      transform: translateY(-40px) translateX(-10px);
-    }
-    75% {
-      transform: translateY(-20px) translateX(10px);
-    }
+  .animate-size-slow-1 {
+    animation: size-pulse 28s ease-in-out infinite;
   }
 
-  @keyframes float-medium {
-    0%, 100% {
-      transform: translateY(0) translateX(0);
-    }
-    33% {
-      transform: translateY(-30px) translateX(-15px);
-    }
-    66% {
-      transform: translateY(-15px) translateX(15px);
-    }
+  .animate-size-slow-2 {
+    animation: size-pulse 35s ease-in-out infinite;
   }
 
-  @keyframes float-fast {
-    0%, 100% {
-      transform: translateY(0) translateX(0);
-    }
-    50% {
-      transform: translateY(-25px) translateX(12px);
-    }
+  .animate-size-slow-3 {
+    animation: size-pulse 22s ease-in-out infinite;
   }
 
-  @keyframes rotate-slow {
-    0% {
+  .animate-size-slow-4 {
+    animation: size-pulse 40s ease-in-out infinite;
+  }
+
+  .animate-size-slow-5 {
+    animation: size-pulse 31s ease-in-out infinite;
+  }
+
+  .animate-size-slow-6 {
+    animation: size-pulse 26s ease-in-out infinite;
+  }
+
+  .animate-size-slow-7 {
+    animation: size-pulse 38s ease-in-out infinite;
+  }
+
+  .animate-size-slow-8 {
+    animation: size-pulse 33s ease-in-out infinite;
+  }
+
+  .animate-size-slow-9 {
+    animation: size-pulse 29s ease-in-out infinite;
+  }
+
+  .animate-size-slow-10 {
+    animation: size-pulse 42s ease-in-out infinite;
+  }
+
+  /* Spinner animation */
+  @keyframes spin {
+    from {
       transform: rotate(0deg);
     }
-    100% {
+    to {
       transform: rotate(360deg);
     }
   }
 
-  @keyframes rotate-slow-reverse {
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  /* Rising bubble animations - slow upward and leftward movement */
+  @keyframes bubble-rise-1 {
     0% {
-      transform: rotate(360deg);
+      transform: translate(80vw, 110vh);
+      opacity: 0;
+    }
+    5% {
+      opacity: 0.05;
+    }
+    95% {
+      opacity: 0.05;
     }
     100% {
-      transform: rotate(0deg);
+      transform: translate(60vw, -10vh);
+      opacity: 0;
     }
   }
 
-  @keyframes pulse-slow {
-    0%, 100% {
-      opacity: 0.1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.15;
-      transform: scale(1.05);
-    }
-  }
-
-  @keyframes ping-slow {
+  @keyframes bubble-rise-2 {
     0% {
-      transform: scale(1);
-      opacity: 0.2;
+      transform: translate(20vw, 110vh);
+      opacity: 0;
     }
-    50% {
-      transform: scale(1.5);
-      opacity: 0.1;
+    5% {
+      opacity: 0.05;
+    }
+    95% {
+      opacity: 0.05;
     }
     100% {
-      transform: scale(1);
-      opacity: 0.2;
+      transform: translate(5vw, -10vh);
+      opacity: 0;
     }
   }
 
-  .animate-float-slow {
-    animation: float-slow 20s ease-in-out infinite;
+  @keyframes bubble-rise-3 {
+    0% {
+      transform: translate(60vw, 110vh);
+      opacity: 0;
+    }
+    5% {
+      opacity: 0.05;
+    }
+    95% {
+      opacity: 0.05;
+    }
+    100% {
+      transform: translate(45vw, -10vh);
+      opacity: 0;
+    }
   }
 
-  .animate-float-medium {
-    animation: float-medium 15s ease-in-out infinite;
+  @keyframes bubble-rise-4 {
+    0% {
+      transform: translate(30vw, 110vh);
+      opacity: 0;
+    }
+    5% {
+      opacity: 0.05;
+    }
+    95% {
+      opacity: 0.05;
+    }
+    100% {
+      transform: translate(10vw, -10vh);
+      opacity: 0;
+    }
   }
 
-  .animate-float-fast {
-    animation: float-fast 10s ease-in-out infinite;
+  @keyframes bubble-rise-5 {
+    0% {
+      transform: translate(50vw, 110vh);
+      opacity: 0;
+    }
+    5% {
+      opacity: 0.05;
+    }
+    95% {
+      opacity: 0.05;
+    }
+    100% {
+      transform: translate(30vw, -10vh);
+      opacity: 0;
+    }
   }
 
-  .animate-rotate-slow {
-    animation: rotate-slow 30s linear infinite;
+  @keyframes bubble-rise-6 {
+    0% {
+      transform: translate(10vw, 110vh);
+      opacity: 0;
+    }
+    5% {
+      opacity: 0.05;
+    }
+    95% {
+      opacity: 0.05;
+    }
+    100% {
+      transform: translate(-5vw, -10vh);
+      opacity: 0;
+    }
   }
 
-  .animate-rotate-slow-reverse {
-    animation: rotate-slow-reverse 25s linear infinite;
+  .animate-bubble-1 {
+    animation: bubble-rise-1 55s linear infinite;
   }
 
-  .animate-pulse-slow {
-    animation: pulse-slow 8s ease-in-out infinite;
+  .animate-bubble-2 {
+    animation: bubble-rise-2 68s linear infinite 8s;
   }
 
-  .animate-ping-slow {
-    animation: ping-slow 6s ease-in-out infinite;
+  .animate-bubble-3 {
+    animation: bubble-rise-3 48s linear infinite 15s;
   }
 
-  .delay-1000 {
-    animation-delay: 1s;
+  .animate-bubble-4 {
+    animation: bubble-rise-4 72s linear infinite 22s;
   }
 
-  .delay-2000 {
-    animation-delay: 2s;
+  .animate-bubble-5 {
+    animation: bubble-rise-5 60s linear infinite 30s;
+  }
+
+  .animate-bubble-6 {
+    animation: bubble-rise-6 65s linear infinite 5s;
+  }
+
+  .animate-bubble-7 {
+    animation: bubble-rise-1 58s linear infinite 38s;
+  }
+
+  .animate-bubble-8 {
+    animation: bubble-rise-3 63s linear infinite 12s;
+  }
+
+  .animate-bubble-9 {
+    animation: bubble-rise-2 52s linear infinite 25s;
+  }
+
+  .animate-bubble-10 {
+    animation: bubble-rise-4 70s linear infinite 18s;
+  }
+
+  .animate-bubble-11 {
+    animation: bubble-rise-5 56s linear infinite 35s;
+  }
+
+  .animate-bubble-12 {
+    animation: bubble-rise-6 62s linear infinite 42s;
   }
 }
 
 @layer components {
-  /* Glassmorphism 2.0 Base */
-  .glass {
-    @apply bg-white/5;
-    @apply backdrop-blur-xl backdrop-saturate-150;
-    @apply border border-white/10;
-    @apply shadow-2xl shadow-black/50;
-    @apply transition-all duration-300 ease-in-out;
+  /* Base card styles */
+  .base-card {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    overflow: visible;
+    opacity: 1;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, background-color 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(7px);
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-translucent);
+    z-index: 1;
   }
 
-  .glass-hover {
-    @apply hover:bg-white/10 hover:border-white/20;
-    @apply hover:-translate-y-0.5;
-    @apply hover:shadow-[0_6px_12px_rgba(0,0,0,0.5)];
-    @apply cursor-pointer;
+  .base-card:hover {
+    color: var(--text);
+    z-index: 30;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px var(--shadow-color);
+    background-color: var(--card-bg-hover);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
   }
 
-  /* Enhanced card hover effect for all glass cards */
-  .glass:hover {
-    @apply backdrop-blur-2xl;
+  /* Button styles */
+  .btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    transition: all 0.2s ease;
+  }
+
+  .btn.primary {
+    background: var(--primary-gradient);
+    background-color: var(--primary);
+    opacity: 0.6;
+  }
+
+  .btn.primary:hover {
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow-color);
+  }
+
+  .btn.primary:active {
+    transform: translateY(1px);
+    box-shadow: 0 0px 0px var(--shadow-color);
+  }
+
+  .btn.primary:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+  }
+
+  .btn.secondary {
+    background: var(--glass-gradient);
+    color: var(--text);
+    background-color: var(--glass);
+    opacity: 0.6;
+  }
+
+  .btn.secondary:hover {
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow-color);
+  }
+
+  .btn.secondary:active {
+    transform: translateY(1px);
+    box-shadow: 0 0px 0px var(--shadow-color);
+  }
+
+  .btn.secondary:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+  }
+
+  .btn.danger {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.7) 0%, var(--danger) 50%);
+    opacity: 0.6;
+  }
+
+  .btn.danger:hover {
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
   }
 
   /* Status Colors */
@@ -196,17 +429,39 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-white/5 rounded-full;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-white/20 rounded-full;
-    @apply hover:bg-white/30;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
   }
 
-  /* Text gradients */
-  .text-gradient {
-    @apply bg-gradient-to-r from-blue-400 to-purple-400;
-    @apply bg-clip-text text-transparent;
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  /* Focus States */
+  :focus {
+    outline: none;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
   }
 }

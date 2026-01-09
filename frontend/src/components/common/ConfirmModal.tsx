@@ -54,11 +54,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <div className="flex gap-3 pt-2">
           <GlassButton
             onClick={handleConfirm}
-            className={
-              confirmVariant === 'danger'
-                ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/30'
-                : ''
-            }
+            variant={confirmVariant}
           >
             {confirmText}
           </GlassButton>

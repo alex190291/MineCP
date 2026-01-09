@@ -26,10 +26,7 @@ export const Header: React.FC = () => {
 
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-      <div>
-        <h1 className="text-lg font-semibold">{t('header.title')}</h1>
-        <p className="text-xs text-white/50">{t('header.subtitle')}</p>
-      </div>
+      <div></div>
 
       <div className="flex items-center gap-3">
         <div className="text-right">

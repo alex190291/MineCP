@@ -25,10 +25,8 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, defaultTab, children }) => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap',
-              activeTab === tab.id
-                ? 'bg-white/10 text-white border border-white/20'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+              'btn secondary flex items-center gap-2 whitespace-nowrap',
+              activeTab === tab.id && 'opacity-100 shadow-[0_4px_8px_rgba(255,255,255,0.15)] -translate-y-0.5'
             )}
           >
             {tab.icon}

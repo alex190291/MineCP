@@ -1,0 +1,161 @@
+/* Form label */
+label {
+  display: inline-block;
+  font-weight: 500;
+}
+
+select {
+  /* Reset appearance */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 30px 8px 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 4px;
+  color: var(--text-color, var(--text));
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  /* Custom arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='rgba(255, 255, 255, 0.7)'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 1em;
+}
+
+select option {
+  background-color: var(--dropdown-bg);
+  color: var(--dropdown-text);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="color"] {
+  width: 80px;
+  height: 2.5rem;
+  box-sizing: border-box;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+textarea {
+  width: 100%;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  resize: vertical;
+}
+
+select:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+textarea:focus {
+  border-color: rgba(var(--primary-rgb, 45, 90, 79), 0.7);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb, 45, 90, 79), 0.15);
+}
+
+/* Placeholder text color */
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+input[type="email"]::placeholder,
+input[type="number"]::placeholder,
+textarea::placeholder {
+  color: var(--text-translucent);
+  opacity: 1;
+}
+
+input[type="text"]::-webkit-input-placeholder,
+input[type="password"]::-webkit-input-placeholder,
+input[type="email"]::-webkit-input-placeholder,
+input[type="number"]::-webkit-input-placeholder,
+textarea::-webkit-input-placeholder {
+  color: var(--text-translucent);
+}
+
+input[type="text"]::-moz-placeholder,
+input[type="password"]::-moz-placeholder,
+input[type="email"]::-moz-placeholder,
+input[type="number"]::-moz-placeholder,
+textarea::-moz-placeholder {
+  color: var(--text-translucent);
+  opacity: 1;
+}
+
+.form-input {
+  margin: 0;
+}
+
+.input-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.form-control {
+  margin: 0;
+}
+
+.full-width {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: block;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem 0.5rem 0;
+  margin: 0 0 0 0;
+}
+
+.form-row,
+.form-group {
+  display: flex;
+  align-items: center;
+}
+
+.form-row label,
+.form-group label {
+  min-width: 120px;
+  text-align: left;
+}
+
+.form-row.toggle,
+.form-group.toggle {
+  align-items: center;
+}
+
+.invisible {
+  visibility: hidden;
+}
