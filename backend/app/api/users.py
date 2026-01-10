@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.extensions import db, limiter
 from app.models.user import User
+from app.models.role import Role
 from app.utils.audit import log_user_create, log_user_delete, log_user_update, log_password_change
 from app.utils.security import validate_password_strength
 
@@ -43,19 +44,40 @@ def create_user():
             return jsonify({'error': 'Forbidden'}), 403
 
     data = request.get_json() or {}
-    required = ['username', 'email', 'role']
+    required = ['username', 'email']
     for field in required:
         if field not in data:
             return jsonify({'error': f'Missing required field: {field}'}), 400
 
+    # Get role_id from request (can be role_id or old 'role' for backward compatibility)
+    role_id = data.get('role_id') or data.get('role')
+    if not role_id:
+        return jsonify({'error': 'role_id is required'}), 400
+
+    # If role is a string (old format), convert to role_id
+    if isinstance(role_id, str):
+        # Check if it's a role name (backward compatibility) or UUID
+        role = Role.query.filter_by(name=role_id).first() or Role.query.get(role_id)
+        if not role:
+            return jsonify({'error': f'Invalid role: {role_id}'}), 400
+        role_id = role.id
+
+    # Validate role exists
+    role = Role.query.get(role_id)
+    if not role:
+        return jsonify({'error': 'Invalid role_id'}), 400
+
     if current_user.role == 'bootstrap':
-        if User.query.filter_by(role='admin').first():
+        # Bootstrap user can only create admin
+        admin_role = Role.query.filter_by(name='admin').first()
+        if not admin_role:
+            return jsonify({'error': 'Admin role not found in database'}), 500
+        # Check if any admin users already exist
+        if User.query.filter(User.role_id == admin_role.id).first():
             return jsonify({'error': 'Admin account already exists'}), 409
-        if data.get('role') != 'admin':
+        if role.name != 'admin':
             return jsonify({'error': 'Bootstrap can only create an admin account'}), 403
-    else:
-        if data.get('role') not in ['admin', 'user']:
-            return jsonify({'error': 'Invalid role'}), 400
+        role_id = admin_role.id
 
     if User.query.filter_by(username=data['username']).first():
         return jsonify({'error': 'Username already exists'}), 409
@@ -65,13 +87,14 @@ def create_user():
     user = User(
         username=data['username'],
         email=data['email'],
-        role=data.get('role', 'user'),
+        role_id=role_id,
         is_ldap_user=data.get('is_ldap_user', False),
         is_active=data.get('is_active', True),
     )
 
     if current_user.role == 'bootstrap':
-        user.role = 'admin'
+        admin_role = Role.query.filter_by(name='admin').first()
+        user.role_id = admin_role.id
         user.is_ldap_user = False
         user.is_active = True
 
@@ -151,11 +174,6 @@ def update_user(user_id):
         'is_active': lambda v: isinstance(v, bool),
     }
 
-    ADMIN_ONLY_FIELDS = {
-        'role': lambda v: v in ['user', 'admin'],
-        'is_ldap_user': lambda v: isinstance(v, bool),
-    }
-
     # Update allowed fields
     for field, validator in ALLOWED_FIELDS.items():
         if field in data:
@@ -167,13 +185,29 @@ def update_user(user_id):
 
     # Update admin-only fields
     if requester and requester.role == 'admin':
-        for field, validator in ADMIN_ONLY_FIELDS.items():
-            if field in data:
-                value = data[field]
-                if not validator(value):
-                    return jsonify({'error': f'Invalid value for field: {field}'}), 400
-                setattr(user, field, value)
-                fields_changed.append(field)
+        # Handle role_id or role field
+        if 'role_id' in data or 'role' in data:
+            role_id = data.get('role_id') or data.get('role')
+
+            # If role is a string (old format), convert to role_id
+            if isinstance(role_id, str):
+                role = Role.query.filter_by(name=role_id).first() or Role.query.get(role_id)
+                if not role:
+                    return jsonify({'error': f'Invalid role: {role_id}'}), 400
+                role_id = role.id
+
+            # Validate role exists
+            if not Role.query.get(role_id):
+                return jsonify({'error': 'Invalid role_id'}), 400
+
+            user.role_id = role_id
+            fields_changed.append('role_id')
+
+        if 'is_ldap_user' in data:
+            if not isinstance(data['is_ldap_user'], bool):
+                return jsonify({'error': 'Invalid value for field: is_ldap_user'}), 400
+            user.is_ldap_user = data['is_ldap_user']
+            fields_changed.append('is_ldap_user')
 
     if 'password' in data and not user.is_ldap_user:
         password = data['password']

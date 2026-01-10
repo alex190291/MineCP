@@ -4,7 +4,7 @@ import { User } from '@/types/user';
 export interface CreateUserData {
   username: string;
   email: string;
-  role: 'admin' | 'user';
+  role_id: string;  // UUID of role
   password?: string;
   is_ldap_user?: boolean;
   is_active?: boolean;
@@ -13,7 +13,7 @@ export interface CreateUserData {
 export interface UpdateUserData {
   username?: string;
   email?: string;
-  role?: 'admin' | 'user';
+  role_id?: string;  // UUID of role
   password?: string;
   is_ldap_user?: boolean;
   is_active?: boolean;

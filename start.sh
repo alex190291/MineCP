@@ -21,6 +21,13 @@ echo "Installing dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
+echo "Checking for pending database migrations..."
+if ! python run_migrations.py; then
+  echo "ERROR: Database migrations failed!" >&2
+  echo "Please fix the migration issues before starting the application." >&2
+  exit 1
+fi
+
 CERT_FILE="${SSL_CERT_FILE:-}"
 KEY_FILE="${SSL_KEY_FILE:-}"
 

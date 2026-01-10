@@ -33,7 +33,7 @@ export const BootstrapSetup: React.FC = () => {
       usersAPI.create({
         username: data.username,
         email: data.email,
-        role: 'admin',
+        role_id: 'admin',  // Backend will convert 'admin' name to role_id
         password: data.password,
         is_ldap_user: false,
         is_active: true,

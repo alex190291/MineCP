@@ -10,14 +10,16 @@ import { GlassInput } from '@/components/common/GlassInput';
 import { GlassButton } from '@/components/common/GlassButton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { usersAPI, CreateUserData, UpdateUserData } from '@/api/users';
+import { rolesAPI } from '@/api/roles';
 import { User } from '@/types/user';
+import { Role } from '@/types/roles';
 import { useAuthStore } from '@/store/authStore';
 import { formatDate } from '@/utils/formatters';
 
 interface UserFormData {
   username: string;
   email: string;
-  role: 'admin' | 'user';
+  role_id: string;
   password?: string;
   is_ldap_user: boolean;
   is_active: boolean;
@@ -42,7 +44,7 @@ export const UserManagement: React.FC = () => {
     defaultValues: {
       username: '',
       email: '',
-      role: 'user',
+      role_id: '',
       password: '',
       is_ldap_user: false,
       is_active: true,
@@ -52,6 +54,11 @@ export const UserManagement: React.FC = () => {
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: usersAPI.list,
+  });
+
+  const { data: roles, isLoading: rolesLoading } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesAPI.listRoles,
   });
 
   const createMutation = useMutation({
@@ -113,10 +120,12 @@ export const UserManagement: React.FC = () => {
   const handleCreateClick = () => {
     setIsCreating(true);
     setEditingUser(null);
+    // Find the default viewer role
+    const viewerRole = roles?.find((r: Role) => r.name === 'viewer');
     reset({
       username: '',
       email: '',
-      role: 'user',
+      role_id: viewerRole?.id || '',
       password: '',
       is_ldap_user: false,
       is_active: true,
@@ -130,7 +139,7 @@ export const UserManagement: React.FC = () => {
     reset({
       username: user.username,
       email: user.email,
-      role: user.role === 'bootstrap' ? 'user' : user.role,
+      role_id: user.role_id || '',
       password: '',
       is_ldap_user: user.is_ldap_user,
       is_active: user.is_active,
@@ -175,7 +184,7 @@ export const UserManagement: React.FC = () => {
       const updateData: UpdateUserData = {
         username: data.username,
         email: data.email,
-        role: data.role,
+        role_id: data.role_id,
         is_active: data.is_active,
       };
 
@@ -194,7 +203,7 @@ export const UserManagement: React.FC = () => {
       const createData: CreateUserData = {
         username: data.username,
         email: data.email,
-        role: data.role,
+        role_id: data.role_id,
         password: data.password,
         is_ldap_user: false,
         is_active: data.is_active,
@@ -305,14 +314,21 @@ export const UserManagement: React.FC = () => {
                     {t('users.role')}
                   </label>
                   <select
-                    {...register('role', { required: t('users.form.roleRequired') })}
+                    {...register('role_id', { required: t('users.form.roleRequired') })}
                     className="w-full px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-white/30"
                   >
-                    <option value="user">{t('users.user')}</option>
-                    <option value="admin">{t('users.admin')}</option>
+                    {rolesLoading ? (
+                      <option value="">Loading roles...</option>
+                    ) : (
+                      roles?.map((role: Role) => (
+                        <option key={role.id} value={role.id} className="text-black">
+                          {role.name}
+                        </option>
+                      ))
+                    )}
                   </select>
-                  {errors.role && (
-                    <p className="text-red-400 text-sm mt-1">{errors.role.message}</p>
+                  {errors.role_id && (
+                    <p className="text-red-400 text-sm mt-1">{errors.role_id.message}</p>
                   )}
                 </div>
 

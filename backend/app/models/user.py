@@ -21,8 +21,11 @@ class User(db.Model):
     ldap_groups = db.Column(db.Text, nullable=True)  # JSON list of LDAP group DNs/names
 
     # Role and status
-    role = db.Column(db.String(20), default='user', nullable=False)  # 'admin' or 'user'
+    role_id = db.Column(db.String(36), db.ForeignKey('roles.id'), nullable=True)  # User's global role
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    # Relationship to role
+    global_role = db.relationship('Role', foreign_keys=[role_id])
 
     # Two-Factor Authentication
     totp_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
@@ -47,13 +50,21 @@ class User(db.Model):
             return False  # LDAP users authenticate via LDAP
         return check_password_hash(self.password_hash, password)
 
+    @property
+    def role(self):
+        """Backward compatibility property for role name."""
+        if self.global_role:
+            return self.global_role.name
+        return 'user'  # Default fallback
+
     def to_dict(self):
         """Convert to dictionary."""
         return {
             'id': self.id,
             'username': self.username,
             'email': self.email,
-            'role': self.role,
+            'role': self.role,  # Uses the property above
+            'role_id': self.role_id,
             'is_ldap_user': self.is_ldap_user,
             'is_active': self.is_active,
             'totp_enabled': self.totp_enabled,

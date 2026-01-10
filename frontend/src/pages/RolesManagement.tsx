@@ -302,7 +302,7 @@ export const RolesManagement: React.FC = () => {
             <p className="text-white/60">Select a role to edit.</p>
           ) : (
             <div className="space-y-4">
-              <form className="space-y-3" onSubmit={handleRoleUpdate}>
+              <form key={selectedRole.id} className="space-y-3" onSubmit={handleRoleUpdate}>
                 <input
                   name="name"
                   defaultValue={selectedRole.name}

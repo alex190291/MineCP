@@ -1,10 +1,11 @@
-export type UserRole = 'admin' | 'user' | 'bootstrap';
+export type UserRole = 'admin' | 'user' | 'bootstrap' | 'operator' | 'viewer';
 
 export interface User {
   id: string;
   username: string;
   email: string;
-  role: UserRole;
+  role: UserRole | string;  // role name (computed from role_id)
+  role_id?: string;  // foreign key to roles table
   is_ldap_user: boolean;
   is_active: boolean;
   created_at: string;
