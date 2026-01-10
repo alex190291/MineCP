@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '@/store/authStore';
 
 const apiClient = axios.create({
   baseURL: '/api',
@@ -27,12 +28,21 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const status = error.response?.status;
+    const clearAuthAndRedirect = () => {
+      useAuthStore.getState().clearAuth();
+      window.location.href = '/login';
+    };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if ((status === 401 || status === 422) && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
+        if (!refreshToken) {
+          clearAuthAndRedirect();
+          return Promise.reject(error);
+        }
         const response = await axios.post('/api/auth/refresh', null, {
           headers: {
             Authorization: `Bearer ${refreshToken}`,
@@ -46,9 +56,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         // Refresh failed, logout user
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+        clearAuthAndRedirect();
         return Promise.reject(refreshError);
       }
     }

@@ -41,7 +41,7 @@ const languageOptions = [
 
 export const Settings: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, setRequirePasswordChange } = useAuthStore();
   const [accountMessage, setAccountMessage] = React.useState('');
   const [ldapMessage, setLdapMessage] = React.useState('');
   const [selectedPreset, setSelectedPreset] = React.useState(0);
@@ -64,8 +64,11 @@ export const Settings: React.FC = () => {
 
   const accountMutation = useMutation({
     mutationFn: (data: AccountFormData) => usersAPI.update(user?.id || '', data),
-    onSuccess: (updated) => {
+    onSuccess: (updated, variables) => {
       updateUser(updated);
+      if (variables.password && variables.password.trim()) {
+        setRequirePasswordChange(false);
+      }
       setAccountMessage('Account updated successfully.');
     },
     onError: (error) => {

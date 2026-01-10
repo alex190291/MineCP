@@ -60,12 +60,9 @@ def login():
         if (user.username == default_admin_username and
             password == default_admin_password and
             user.role == 'admin'):
-            return jsonify({
-                'error': 'Default password must be changed',
-                'message': 'You are using the default administrator password. For security reasons, you must change your password before accessing the system.',
-                'require_password_change': True,
-                'user_id': user.id
-            }), 403
+            require_password_change = True
+        else:
+            require_password_change = False
 
         # Check if 2FA is enabled for this user
         if user.totp_enabled:
@@ -111,7 +108,10 @@ def login():
         user.last_login = datetime.utcnow()
         db.session.commit()
 
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(
+            identity=user.id,
+            additional_claims={'setup_required': require_password_change}
+        )
         refresh_token = create_refresh_token(identity=user.id)
 
         # Audit log successful login
@@ -120,7 +120,8 @@ def login():
         return jsonify({
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'require_password_change': require_password_change
         }), 200
 
     ldap_result = _ldap_authenticate(username, password)
@@ -141,6 +142,7 @@ def login():
             return jsonify({'error': 'Account is disabled'}), 403
 
         ldap_role = ldap_result.get('role', 'user')
+        ldap_groups = ldap_result.get('groups') or []
 
         if not user:
             resolved_username = ldap_result.get('username') or username
@@ -160,6 +162,9 @@ def login():
             user.role = ldap_role  # Update role based on current LDAP groups
             if ldap_result.get('email'):
                 user.email = ldap_result['email']
+        if ldap_groups:
+            import json as _json
+            user.ldap_groups = _json.dumps(ldap_groups)
 
         user.last_login = datetime.utcnow()
         db.session.commit()
@@ -348,6 +353,69 @@ def _ldap_authenticate(username: str, password: str):
             return value.strip().lower() in ('true', '1', 'yes')
         return False
 
+    def extract_group_name(dn: str) -> str | None:
+        if not dn:
+            return None
+        parts = dn.split(',')
+        for part in parts:
+            if part.strip().lower().startswith('cn='):
+                return part.split('=', 1)[1]
+        return None
+
+    def normalize_group_filter(filter_template: str, user_dn_value: str) -> str:
+        from ldap3.utils.conv import escape_filter_chars
+
+        safe_username = escape_filter_chars(username)
+        safe_dn = escape_filter_chars(user_dn_value)
+        tokens = {
+            '{username}': safe_username,
+            '{user}': safe_username,
+            '{uid}': safe_username,
+            '%s': safe_username,
+            '%u': safe_username,
+            '%uid': safe_username,
+            '{dn}': safe_dn,
+            '{user_dn}': safe_dn,
+        }
+        result = filter_template
+        for token, value in tokens.items():
+            result = result.replace(token, value)
+        return result
+
+    def get_user_groups(connection, user_dn_value: str, group_search_base: str, group_search_filter: str):
+        groups = []
+        # memberOf attribute (Active Directory, some LDAPs)
+        member_of_dns = entry_attr_values(entry, 'memberOf')
+        for group_dn in member_of_dns:
+            group_name = extract_group_name(group_dn)
+            groups.append({'dn': group_dn, 'name': group_name or group_dn})
+
+        if connection and group_search_base:
+            search_filter = group_search_filter or '(|(member={dn})(uniqueMember={dn})(memberUid={username}))'
+            normalized_filter = normalize_group_filter(search_filter, user_dn_value)
+            try:
+                connection.search(
+                    search_base=group_search_base,
+                    search_filter=normalized_filter,
+                    search_scope=SUBTREE,
+                    attributes=['cn']
+                )
+                for entry_item in connection.entries:
+                    group_dn = entry_item.entry_dn
+                    group_name_values = entry_attr_values(entry_item, 'cn')
+                    group_name = group_name_values[0] if group_name_values else extract_group_name(group_dn)
+                    groups.append({'dn': group_dn, 'name': group_name or group_dn})
+            except Exception as e:
+                current_app.logger.warning(f'LDAP group search failed: {e}')
+
+        # Deduplicate by DN
+        unique = {}
+        for group in groups:
+            group_dn = group.get('dn')
+            if group_dn and group_dn not in unique:
+                unique[group_dn] = group
+        return list(unique.values())
+
     def validate_totp_code(totp_code: str, secrets, valid_window: int = 1) -> bool:
         import base64
         import binascii
@@ -527,11 +595,14 @@ def _ldap_authenticate(username: str, password: str):
             if is_admin:
                 user_role = 'admin'
 
+        groups = get_user_groups(bind_conn, user_dn, config.group_search_base, config.group_search_filter)
+
         return {
             'dn': user_dn,
             'email': email,
             'username': resolved_username,
-            'role': user_role
+            'role': user_role,
+            'groups': groups
         }
 
     except Exception as e:
@@ -607,6 +678,51 @@ def logout():
     log_logout(user_id)
 
     return jsonify({'message': 'Logged out successfully'}), 200
+
+
+@bp.route('/complete-setup', methods=['POST'])
+@jwt_required()
+def complete_setup():
+    """Delete bootstrap/default admin user after setup and revoke token."""
+    from app.utils.token_blacklist import get_blacklist
+    from app.models.system_setup import SystemSetup
+    from flask import current_app
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    jwt_data = get_jwt()
+    jti = jwt_data["jti"]
+    exp_timestamp = jwt_data["exp"]
+
+    setup_required = bool(jwt_data.get('setup_required'))
+
+    if not user:
+        return jsonify({'message': 'User already removed'}), 200
+
+    if user.role != 'bootstrap' and not setup_required:
+        return jsonify({'error': 'Setup completion not allowed'}), 403
+
+    try:
+        db.session.delete(user)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Failed to delete setup user: {e}")
+        return jsonify({'error': 'Failed to complete setup'}), 500
+
+    try:
+        SystemSetup.mark_setup_complete()
+    except Exception as e:
+        current_app.logger.warning(f"Failed to mark setup complete: {e}")
+
+    # Blacklist current token
+    now_timestamp = datetime.utcnow().timestamp()
+    expires_in = int(exp_timestamp - now_timestamp)
+    if expires_in > 0:
+        blacklist = get_blacklist()
+        blacklist.add_token(jti, expires_in)
+
+    return jsonify({'message': 'Setup completed'}), 200
 
 
 @bp.route('/2fa/setup', methods=['POST'])

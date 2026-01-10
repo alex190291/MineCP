@@ -13,6 +13,7 @@ import type { ModSearchResult } from '@/api/mods';
 
 interface ModsTabProps {
   serverId: string;
+  canManage?: boolean;
 }
 
 const getModNameFromUrl = (url: string) => {
@@ -52,7 +53,7 @@ const getSearchResultUrl = (result: ModSearchResult) => {
   return '';
 };
 
-export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
+export const ModsTab: React.FC<ModsTabProps> = ({ serverId, canManage = false }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -154,7 +155,7 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
             <GlassButton
               onClick={() => fileInputRef.current?.click()}
               loading={uploadingFile}
-              disabled={uploadingFile}
+              disabled={uploadingFile || !canManage}
             >
               <Upload className="w-4 h-4 mr-2" />
               {uploadingFile ? t('mods.uploading') : t('mods.uploadFile')}
@@ -171,11 +172,12 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
                 placeholder={t('mods.downloadUrlPlaceholder')}
                 value={modrinthUrl}
                 onChange={(e) => setModrinthUrl(e.target.value)}
+                disabled={!canManage}
               />
               <GlassButton
                 onClick={handleDownloadMod}
                 loading={downloadModMutation.isPending}
-                disabled={!modrinthUrl || downloadModMutation.isPending}
+                disabled={!modrinthUrl || downloadModMutation.isPending || !canManage}
               >
                 <Download className="w-4 h-4 mr-2" />
                 {t('common.download')}
@@ -193,6 +195,7 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+                disabled={!canManage}
               />
             </div>
 
@@ -232,7 +235,7 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
                         <GlassButton
                           size="sm"
                           onClick={() => setModrinthUrl(resultUrl)}
-                          disabled={!resultUrl}
+                          disabled={!resultUrl || !canManage}
                         >
                           {t('mods.select')}
                         </GlassButton>
@@ -286,6 +289,7 @@ export const ModsTab: React.FC<ModsTabProps> = ({ serverId }) => {
                   variant="danger"
                   onClick={() => deleteMutation.mutate(mod.id)}
                   loading={deleteMutation.isPending}
+                  disabled={!canManage}
                 >
                   <Trash2 className="w-4 h-4" />
                 </GlassButton>

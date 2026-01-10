@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'user';
+export type UserRole = 'admin' | 'user' | 'bootstrap';
 
 export interface User {
   id: string;
@@ -20,4 +20,5 @@ export interface AuthResponse {
   access_token: string;
   refresh_token: string;
   user: User;
+  require_password_change?: boolean;
 }

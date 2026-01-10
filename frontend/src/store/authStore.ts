@@ -7,9 +7,16 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: User, accessToken: string, refreshToken: string) => void;
+  requirePasswordChange: boolean;
+  setAuth: (
+    user: User,
+    accessToken: string,
+    refreshToken: string,
+    requirePasswordChange?: boolean
+  ) => void;
   clearAuth: () => void;
   updateUser: (user: User) => void;
+  setRequirePasswordChange: (required: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -19,8 +26,9 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      requirePasswordChange: false,
 
-      setAuth: (user, accessToken, refreshToken) => {
+      setAuth: (user, accessToken, refreshToken, requirePasswordChange = false) => {
         localStorage.setItem('access_token', accessToken);
         localStorage.setItem('refresh_token', refreshToken);
         set({
@@ -28,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken,
           refreshToken,
           isAuthenticated: true,
+          requirePasswordChange,
         });
       },
 
@@ -39,11 +48,16 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
+          requirePasswordChange: false,
         });
       },
 
       updateUser: (user) => {
         set({ user });
+      },
+
+      setRequirePasswordChange: (required) => {
+        set({ requirePasswordChange: required });
       },
     }),
     {
@@ -51,6 +65,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        requirePasswordChange: state.requirePasswordChange,
       }),
     }
   )

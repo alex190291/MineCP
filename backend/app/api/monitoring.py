@@ -15,6 +15,7 @@ from app.services.docker_manager import DockerManager
 from pathlib import Path
 import json
 import re
+from app.utils.permissions import user_has_server_permission
 
 bp = Blueprint('monitoring', __name__)
 
@@ -60,7 +61,7 @@ def get_server_metrics(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running' or not server.container_id:
@@ -85,7 +86,7 @@ def get_server_metrics_history(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     metrics_collector = get_metrics_collector()
@@ -104,7 +105,7 @@ def get_online_players_endpoint(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
@@ -130,7 +131,7 @@ def get_all_players_endpoint(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     # Get currently online players
@@ -254,7 +255,7 @@ def ban_player(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.manage'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
@@ -301,7 +302,7 @@ def unban_player(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.manage'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
@@ -358,7 +359,7 @@ def op_player(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.manage'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
@@ -395,7 +396,7 @@ def deop_player(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.manage'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
@@ -432,7 +433,7 @@ def kick_player(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.manage'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
@@ -470,7 +471,7 @@ def get_banned_players(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.players.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':

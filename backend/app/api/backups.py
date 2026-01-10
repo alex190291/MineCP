@@ -10,6 +10,7 @@ from app.models.backup import Backup
 from app.models.server import Server
 from app.models.user import User
 from app.services.backup_manager import BackupManager
+from app.utils.permissions import user_has_server_permission, get_accessible_servers
 
 bp = Blueprint('backups', __name__)
 
@@ -18,7 +19,7 @@ def _require_server_access(user: User, server: Server):
         return jsonify({'error': 'Server not found'}), 404
     if not user:
         return jsonify({'error': 'Forbidden'}), 403
-    if user and user.role != 'admin' and server.created_by != user.id:
+    if not user_has_server_permission(user, server, 'server.backups.view'):
         return jsonify({'error': 'Forbidden'}), 403
     return None
 
@@ -30,10 +31,15 @@ def list_backups():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
-    if user and user.role == 'admin':
+    if not user:
+        return jsonify({'error': 'Forbidden'}), 403
+
+    if user.role == 'admin':
         backups = Backup.query.all()
     else:
-        backups = Backup.query.join(Server).filter(Server.created_by == user_id).all()
+        servers = get_accessible_servers(user, 'server.backups.view')
+        server_ids = [server.id for server in servers]
+        backups = Backup.query.filter(Backup.server_id.in_(server_ids)).all()
 
     return jsonify([backup.to_dict() for backup in backups]), 200
 
@@ -66,6 +72,9 @@ def create_backup(server_id):
     access_check = _require_server_access(user, server)
     if access_check:
         return access_check
+
+    if not user_has_server_permission(user, server, 'server.backups.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
         return jsonify({'error': 'Server must be running to create a backup'}), 400
@@ -125,6 +134,9 @@ def restore_backup(backup_id):
     if access_check:
         return access_check
 
+    if not user_has_server_permission(user, server, 'server.backups.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
+
     if server.status == 'running':
         return jsonify({'error': 'Stop the server before restoring a backup'}), 400
 
@@ -153,6 +165,9 @@ def delete_backup(backup_id):
     access_check = _require_server_access(user, server)
     if access_check:
         return access_check
+
+    if not user_has_server_permission(user, server, 'server.backups.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
 
     backup_manager = BackupManager()
     backup_manager.delete_backup(Path(backup.backup_path))

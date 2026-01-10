@@ -11,6 +11,7 @@ from app.extensions import db, limiter
 from app.models.server import Server
 from app.models.user import User
 from app.utils.decorators import limit_content_length
+from app.utils.permissions import user_has_server_permission
 
 bp = Blueprint('files', __name__)
 
@@ -36,7 +37,7 @@ def _require_server_access(user, server):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != get_jwt_identity():
+    if not user or not user_has_server_permission(user, server, 'server.files.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     return None
@@ -181,6 +182,9 @@ def write_file(server_id):
     if access_check:
         return access_check
 
+    if not user_has_server_permission(user, server, 'server.files.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
+
     data = request.get_json() or {}
     relative_path = data.get('path', '')
     content = data.get('content', '')
@@ -227,6 +231,9 @@ def delete_file(server_id):
     access_check = _require_server_access(user, server)
     if access_check:
         return access_check
+
+    if not user_has_server_permission(user, server, 'server.files.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
 
     data = request.get_json() or {}
     relative_path = data.get('path', '')
@@ -281,6 +288,9 @@ def upload_file(server_id):
     access_check = _require_server_access(user, server)
     if access_check:
         return access_check
+
+    if not user_has_server_permission(user, server, 'server.files.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400

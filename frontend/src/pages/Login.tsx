@@ -31,7 +31,16 @@ export const Login: React.FC = () => {
     setErrorMessage('');
     try {
       const response = await authAPI.login(data);
-      setAuth(response.user, response.access_token, response.refresh_token);
+      setAuth(
+        response.user,
+        response.access_token,
+        response.refresh_token,
+        response.require_password_change ?? false
+      );
+      if (response.user.role === 'bootstrap' || response.require_password_change) {
+        navigate('/setup-admin');
+        return;
+      }
       navigate('/');
     } catch (error) {
       if (axios.isAxiosError(error)) {

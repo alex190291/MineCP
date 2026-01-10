@@ -27,13 +27,16 @@ import { PlayersTab } from '@/components/server/PlayersTab';
 import { BackupsTab } from '@/components/server/BackupsTab';
 import { ConsoleTab } from '@/components/server/ConsoleTab';
 import { FilesTab } from '@/components/server/FilesTab';
+import { AccessTab } from '@/components/server/AccessTab';
 import { formatBytes, formatPercent, formatRelativeTime } from '@/utils/formatters';
+import { useAuthStore } from '@/store/authStore';
 
 export const ServerDetails: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
 
   const {
     data: server,
@@ -45,10 +48,16 @@ export const ServerDetails: React.FC = () => {
     enabled: !!id,
   });
 
+  const permissionsQuery = useQuery({
+    queryKey: ['server-permissions', id],
+    queryFn: () => serversAPI.getPermissions(id as string),
+    enabled: !!id,
+  });
+
   const metricsQuery = useQuery({
     queryKey: ['server-metrics', id],
     queryFn: () => serversAPI.getMetrics(id as string),
-    enabled: !!id && server?.status === 'running',
+    enabled: !!id && server?.status === 'running' && permissionsQuery.data?.includes('server.view'),
     refetchInterval: 5000,
   });
 
@@ -100,6 +109,25 @@ export const ServerDetails: React.FC = () => {
     );
   }
 
+  if (permissionsQuery.isLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" />
+      </div>
+    );
+  }
+
+  const permissions = permissionsQuery.data || [];
+  const can = (permission: string) => permissions.includes(permission);
+
+  if (permissionsQuery.isSuccess && !can('server.view')) {
+    return (
+      <GlassCard>
+        <p className="text-white/70">You don't have permission to access this server.</p>
+      </GlassCard>
+    );
+  }
+
   const metrics = metricsQuery.data;
 
   const handleDelete = () => {
@@ -109,14 +137,20 @@ export const ServerDetails: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'overview', label: t('serverDetails.overview'), icon: <BarChart3 className="w-4 h-4" /> },
-    { id: 'settings', label: t('nav.settings'), icon: <Settings className="w-4 h-4" /> },
-    { id: 'mods', label: t('serverDetails.mods'), icon: <Package className="w-4 h-4" /> },
-    { id: 'players', label: t('serverDetails.players'), icon: <Users className="w-4 h-4" /> },
-    { id: 'backups', label: t('serverDetails.backups'), icon: <Database className="w-4 h-4" /> },
-    { id: 'console', label: t('serverDetails.console'), icon: <Terminal className="w-4 h-4" /> },
-    { id: 'files', label: t('serverDetails.files'), icon: <FolderOpen className="w-4 h-4" /> },
+    { id: 'overview', label: t('serverDetails.overview'), icon: <BarChart3 className="w-4 h-4" />, permission: 'server.view' },
+    { id: 'settings', label: t('nav.settings'), icon: <Settings className="w-4 h-4" />, permission: 'server.settings.view' },
+    { id: 'mods', label: t('serverDetails.mods'), icon: <Package className="w-4 h-4" />, permission: 'server.mods.view' },
+    { id: 'players', label: t('serverDetails.players'), icon: <Users className="w-4 h-4" />, permission: 'server.players.view' },
+    { id: 'backups', label: t('serverDetails.backups'), icon: <Database className="w-4 h-4" />, permission: 'server.backups.view' },
+    { id: 'console', label: t('serverDetails.console'), icon: <Terminal className="w-4 h-4" />, permission: 'server.console.view' },
+    { id: 'files', label: t('serverDetails.files'), icon: <FolderOpen className="w-4 h-4" />, permission: 'server.files.view' },
   ];
+
+  if (currentUser?.role === 'admin') {
+    tabs.push({ id: 'access', label: 'Access', icon: <Users className="w-4 h-4" />, permission: 'server.view' });
+  }
+
+  const visibleTabs = tabs.filter((tab) => can(tab.permission));
 
   return (
     <div className="space-y-6">
@@ -133,7 +167,7 @@ export const ServerDetails: React.FC = () => {
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2">
-        {server.status === 'stopped' && (
+        {can('server.control') && server.status === 'stopped' && (
           <GlassButton
             variant="primary"
             onClick={() => startMutation.mutate()}
@@ -143,7 +177,7 @@ export const ServerDetails: React.FC = () => {
             {t('serverDetails.start')}
           </GlassButton>
         )}
-        {server.status === 'running' && (
+        {can('server.control') && server.status === 'running' && (
           <GlassButton
             variant="danger"
             onClick={() => stopMutation.mutate()}
@@ -154,23 +188,27 @@ export const ServerDetails: React.FC = () => {
             {t('serverDetails.stop')}
           </GlassButton>
         )}
-        <GlassButton
-          variant="secondary"
-          onClick={() => restartMutation.mutate()}
-          loading={restartMutation.isPending}
-          disabled={!server.container_id}
-        >
-          <RotateCw className="w-4 h-4 mr-2" />
-          {t('serverDetails.restart')}
-        </GlassButton>
-        <GlassButton variant="ghost" onClick={handleDelete} loading={deleteMutation.isPending}>
-          <Trash2 className="w-4 h-4 mr-2" />
-          {t('serverDetails.deleteServer')}
-        </GlassButton>
+        {can('server.control') && (
+          <GlassButton
+            variant="secondary"
+            onClick={() => restartMutation.mutate()}
+            loading={restartMutation.isPending}
+            disabled={!server.container_id}
+          >
+            <RotateCw className="w-4 h-4 mr-2" />
+            {t('serverDetails.restart')}
+          </GlassButton>
+        )}
+        {can('server.delete') && (
+          <GlassButton variant="ghost" onClick={handleDelete} loading={deleteMutation.isPending}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            {t('serverDetails.deleteServer')}
+          </GlassButton>
+        )}
       </div>
 
       {/* Tabs */}
-      <Tabs tabs={tabs} defaultTab="overview">
+      <Tabs tabs={visibleTabs} defaultTab="overview">
         {(activeTab) => {
           switch (activeTab) {
             case 'overview':
@@ -229,22 +267,48 @@ export const ServerDetails: React.FC = () => {
               );
 
             case 'settings':
-              return <SettingsTab serverId={id as string} serverStatus={server.status} />;
+              return (
+                <SettingsTab
+                  serverId={id as string}
+                  serverStatus={server.status}
+                  canEdit={can('server.settings.edit')}
+                />
+              );
 
             case 'mods':
-              return <ModsTab serverId={id as string} />;
+              return <ModsTab serverId={id as string} canManage={can('server.mods.manage')} />;
 
             case 'players':
-              return <PlayersTab serverId={id as string} serverStatus={server.status} />;
+              return (
+                <PlayersTab
+                  serverId={id as string}
+                  serverStatus={server.status}
+                  canManage={can('server.players.manage')}
+                />
+              );
 
             case 'backups':
-              return <BackupsTab serverId={id as string} serverStatus={server.status} />;
+              return (
+                <BackupsTab
+                  serverId={id as string}
+                  serverStatus={server.status}
+                  canManage={can('server.backups.manage')}
+                />
+              );
 
             case 'console':
-              return <ConsoleTab serverId={id as string} serverStatus={server.status} />;
+              return (
+                <ConsoleTab
+                  serverId={id as string}
+                  serverStatus={server.status}
+                  canCommand={can('server.console.command')}
+                />
+              );
 
             case 'files':
-              return <FilesTab serverId={id as string} />;
+              return <FilesTab serverId={id as string} canManage={can('server.files.manage')} />;
+            case 'access':
+              return <AccessTab serverId={id as string} />;
 
             default:
               return null;

@@ -8,6 +8,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.extensions import db, limiter
 from app.models.server import Server
 from app.models.user import User
+from app.models.role import Role, ServerRoleAssignment
+from app.utils.permissions import user_has_server_permission, get_accessible_servers, PERMISSIONS
 from app.services.docker_manager import DockerManager
 from app.background.task_queue import get_task_queue
 from app.background.server_tasks import deploy_server_async
@@ -43,10 +45,10 @@ def list_servers():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
-    if user and user.role == 'admin':
-        servers = Server.query.all()
-    else:
-        servers = Server.query.filter_by(created_by=user_id).all()
+    if not user:
+        return jsonify({'error': 'Forbidden'}), 403
+
+    servers = get_accessible_servers(user, 'server.view')
 
     return jsonify([server.to_dict() for server in servers]), 200
 
@@ -57,6 +59,9 @@ def list_servers():
 def create_server():
     """Create a new server."""
     user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user or user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
     data = request.get_json() or {}
 
     required = ['name', 'type', 'version', 'memory_limit', 'cpu_limit', 'host_port']
@@ -91,6 +96,16 @@ def create_server():
     db.session.add(server)
     db.session.commit()
 
+    admin_role = Role.query.filter_by(name='admin').first()
+    if admin_role:
+        assignment = ServerRoleAssignment(
+            server_id=server.id,
+            user_id=user_id,
+            role_id=admin_role.id
+        )
+        db.session.add(assignment)
+        db.session.commit()
+
     # Audit log server creation
     log_server_create(server.id, server.name)
 
@@ -111,7 +126,7 @@ def get_server(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     return jsonify(server.to_dict()), 200
@@ -129,7 +144,7 @@ def update_server(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.update'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status not in ['stopped', 'error']:
@@ -159,7 +174,7 @@ def delete_server(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.delete'):
         return jsonify({'error': 'Forbidden'}), 403
 
     # Audit log before deletion
@@ -190,7 +205,7 @@ def start_server(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.control'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status == 'running':
@@ -225,7 +240,7 @@ def stop_server(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.control'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status == 'stopped':
@@ -257,7 +272,7 @@ def restart_server(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.control'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if not server.container_id:
@@ -282,7 +297,7 @@ def get_server_logs(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.console.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if not server.container_id:
@@ -315,7 +330,7 @@ def send_server_command(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.console.command'):
         return jsonify({'error': 'Forbidden'}), 403
 
     if server.status != 'running':
@@ -355,7 +370,7 @@ def get_server_settings(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.settings.view'):
         return jsonify({'error': 'Forbidden'}), 403
 
     # Return server properties from database
@@ -374,7 +389,7 @@ def update_server_settings(server_id):
     if not server:
         return jsonify({'error': 'Server not found'}), 404
 
-    if user and user.role != 'admin' and server.created_by != user_id:
+    if not user or not user_has_server_permission(user, server, 'server.settings.edit'):
         return jsonify({'error': 'Forbidden'}), 403
 
     data = request.get_json() or {}
@@ -391,3 +406,42 @@ def update_server_settings(server_id):
         'settings': server.server_properties,
         'restart_required': restart_required
     }), 200
+
+
+@bp.route('/<server_id>/permissions', methods=['GET'])
+@jwt_required()
+def get_server_permissions(server_id):
+    """Get effective permissions for the current user on a server."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    server = Server.query.get(server_id)
+    if not server:
+        return jsonify({'error': 'Server not found'}), 404
+
+    if not user:
+        return jsonify({'error': 'Forbidden'}), 403
+
+    if user.role == 'admin':
+        permissions = sorted(PERMISSIONS.keys())
+        return jsonify({'permissions': permissions}), 200
+
+    if not user_has_server_permission(user, server, 'server.view'):
+        return jsonify({'error': 'Forbidden'}), 403
+
+    role = None
+    assignment = ServerRoleAssignment.query.filter_by(
+        server_id=server.id,
+        user_id=user.id
+    ).first()
+    if assignment:
+        role = assignment.role
+
+    if not role:
+        from app.utils.permissions import get_group_role_for_server
+        role = get_group_role_for_server(user, server)
+
+    if not role and server.created_by == user.id:
+        role = Role.query.filter_by(name='admin').first()
+
+    permissions = sorted([p.name for p in role.permissions]) if role else ['server.view']
+    return jsonify({'permissions': permissions}), 200

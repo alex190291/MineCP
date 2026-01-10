@@ -18,6 +18,7 @@ from app.models.player import Player
 from app.models.audit_log import AuditLog
 from app.models.ldap_config import LDAPConfig
 from app.models.system_setup import SystemSetup
+from app.models.role import Role, Permission, RolePermission, ServerRoleAssignment, LdapGroupRoleAssignment
 
 __all__ = [
     'User',
@@ -27,5 +28,10 @@ __all__ = [
     'Player',
     'AuditLog',
     'LDAPConfig',
-    'SystemSetup'
+    'SystemSetup',
+    'Role',
+    'Permission',
+    'RolePermission',
+    'ServerRoleAssignment',
+    'LdapGroupRoleAssignment'
 ]

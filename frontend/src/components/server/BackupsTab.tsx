@@ -11,9 +11,14 @@ import { formatBytes, formatRelativeTime } from '@/utils/formatters';
 interface BackupsTabProps {
   serverId: string;
   serverStatus: string;
+  canManage?: boolean;
 }
 
-export const BackupsTab: React.FC<BackupsTabProps> = ({ serverId, serverStatus }) => {
+export const BackupsTab: React.FC<BackupsTabProps> = ({
+  serverId,
+  serverStatus,
+  canManage = false,
+}) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -90,7 +95,7 @@ export const BackupsTab: React.FC<BackupsTabProps> = ({ serverId, serverStatus }
             variant="primary"
             onClick={handleCreateBackup}
             loading={createMutation.isPending}
-            disabled={serverStatus !== 'running' || createMutation.isPending}
+            disabled={serverStatus !== 'running' || createMutation.isPending || !canManage}
           >
             <Plus className="w-4 h-4 mr-2" />
             {t('backups.createBackup')}
@@ -160,26 +165,30 @@ export const BackupsTab: React.FC<BackupsTabProps> = ({ serverId, serverStatus }
                     <Download className="w-4 h-4" />
                   </GlassButton>
 
-                  <GlassButton
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleRestore(backup.id, backup.name)}
-                    loading={restoreMutation.isPending}
-                    disabled={serverStatus === 'running'}
-                    title={t('backups.actions.restore')}
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </GlassButton>
+                  {canManage && (
+                    <GlassButton
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleRestore(backup.id, backup.name)}
+                      loading={restoreMutation.isPending}
+                      disabled={serverStatus === 'running'}
+                      title={t('backups.actions.restore')}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </GlassButton>
+                  )}
 
-                  <GlassButton
-                    size="sm"
-                    variant="danger"
-                    onClick={() => handleDelete(backup.id, backup.name)}
-                    loading={deleteMutation.isPending}
-                    title={t('backups.actions.delete')}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </GlassButton>
+                  {canManage && (
+                    <GlassButton
+                      size="sm"
+                      variant="danger"
+                      onClick={() => handleDelete(backup.id, backup.name)}
+                      loading={deleteMutation.isPending}
+                      title={t('backups.actions.delete')}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </GlassButton>
+                  )}
                 </div>
               </div>
             ))}

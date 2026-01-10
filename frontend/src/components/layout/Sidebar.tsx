@@ -1,20 +1,23 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, Settings, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/utils/cn';
 import { GlassCard } from '@/components/common/GlassCard';
-
-const navItems = [
-  { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
-  { to: '/servers/new', labelKey: 'nav.createServer', icon: PlusCircle },
-  { to: '/users', labelKey: 'nav.users', icon: Users },
-  { to: '/settings', labelKey: 'nav.settings', icon: Settings },
-];
+import { useAuthStore } from '@/store/authStore';
 
 export const Sidebar: React.FC = () => {
   const { t } = useTranslation();
+  const { user } = useAuthStore();
+
+  const navItems = [
+    { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+    ...(user?.role === 'admin' ? [{ to: '/servers/new', labelKey: 'nav.createServer', icon: PlusCircle }] : []),
+    ...(user?.role === 'admin' ? [{ to: '/users', labelKey: 'nav.users', icon: Users }] : []),
+    ...(user?.role === 'admin' ? [{ to: '/roles', labelKey: 'nav.roles', icon: Shield }] : []),
+    { to: '/settings', labelKey: 'nav.settings', icon: Settings },
+  ];
 
   return (
     <aside className="p-4 h-screen w-64 flex-shrink-0">

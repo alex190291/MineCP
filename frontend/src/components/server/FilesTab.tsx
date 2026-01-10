@@ -24,9 +24,10 @@ import { formatBytes, formatRelativeTime } from '@/utils/formatters';
 
 interface FilesTabProps {
   serverId: string;
+  canManage?: boolean;
 }
 
-export const FilesTab: React.FC<FilesTabProps> = ({ serverId }) => {
+export const FilesTab: React.FC<FilesTabProps> = ({ serverId, canManage = false }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [currentPath, setCurrentPath] = useState('');
@@ -164,6 +165,7 @@ export const FilesTab: React.FC<FilesTabProps> = ({ serverId }) => {
                     onChange={(e) => setFileContent(e.target.value)}
                     className="w-full h-96 px-4 py-3 rounded-lg bg-black/40 border border-white/20 text-white font-mono text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 outline-none resize-none"
                     spellCheck={false}
+                    disabled={!canManage}
                   />
 
                   <div className="flex gap-2 mt-4">
@@ -171,6 +173,7 @@ export const FilesTab: React.FC<FilesTabProps> = ({ serverId }) => {
                       variant="primary"
                       onClick={() => saveMutation.mutate()}
                       loading={saveMutation.isPending}
+                      disabled={!canManage}
                     >
                       <Save className="w-4 h-4 mr-2" />
                       {t('files.saveChanges')}
@@ -200,11 +203,12 @@ export const FilesTab: React.FC<FilesTabProps> = ({ serverId }) => {
             type="file"
             onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
             className="flex-1 text-sm text-white/70"
+            disabled={!canManage}
           />
           <GlassButton
             variant="primary"
             onClick={handleUpload}
-            disabled={!uploadFile}
+            disabled={!uploadFile || !canManage}
             loading={uploadMutation.isPending}
           >
             <Upload className="w-4 h-4 mr-2" />
@@ -263,13 +267,15 @@ export const FilesTab: React.FC<FilesTabProps> = ({ serverId }) => {
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {item.type === 'file' && (
                       <>
-                        <button
-                          onClick={() => setEditingFile(item.path)}
-                          className="p-2 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                          title={t('files.edit')}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                        {canManage && (
+                          <button
+                            onClick={() => setEditingFile(item.path)}
+                            className="p-2 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                            title={t('files.edit')}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
                         <a
                           href={filesAPI.downloadFile(serverId, item.path)}
                           download={item.name}
@@ -280,13 +286,15 @@ export const FilesTab: React.FC<FilesTabProps> = ({ serverId }) => {
                         </a>
                       </>
                     )}
-                    <button
-                      onClick={() => handleDelete(item)}
-                      className="p-2 rounded hover:bg-white/10 text-red-400 hover:text-red-300 transition-colors"
-                      title={t('files.delete')}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => handleDelete(item)}
+                        className="p-2 rounded hover:bg-white/10 text-red-400 hover:text-red-300 transition-colors"
+                        title={t('files.delete')}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

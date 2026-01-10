@@ -130,7 +130,7 @@ export const UserManagement: React.FC = () => {
     reset({
       username: user.username,
       email: user.email,
-      role: user.role,
+      role: user.role === 'bootstrap' ? 'user' : user.role,
       password: '',
       is_ldap_user: user.is_ldap_user,
       is_active: user.is_active,

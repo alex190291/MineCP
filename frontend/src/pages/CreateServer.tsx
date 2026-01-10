@@ -12,6 +12,7 @@ import { serversAPI } from '@/api/servers';
 import { versionsAPI } from '@/api/versions';
 import { DEFAULT_SERVER_PROPERTIES, MINECRAFT_VERSIONS, SERVER_TYPES } from '@/utils/constants';
 import { CreateServerData, ServerType } from '@/types/server';
+import { useAuthStore } from '@/store/authStore';
 
 interface CreateServerFormData {
   name: string;
@@ -28,6 +29,7 @@ interface CreateServerFormData {
 export const CreateServer: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [errorMessage, setErrorMessage] = useState('');
   const [availableVersions, setAvailableVersions] = useState<string[]>(MINECRAFT_VERSIONS);
   const [isFetchingVersions, setIsFetchingVersions] = useState(false);
@@ -111,6 +113,16 @@ export const CreateServer: React.FC = () => {
     };
     createMutation.mutate(payload);
   };
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="p-8">
+        <GlassCard className="p-8 text-center">
+          <p className="text-white/70">You don't have permission to create servers.</p>
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -18,6 +18,7 @@ class User(db.Model):
     # LDAP fields
     is_ldap_user = db.Column(db.Boolean, default=False, nullable=False)
     ldap_dn = db.Column(db.String(255), nullable=True)
+    ldap_groups = db.Column(db.Text, nullable=True)  # JSON list of LDAP group DNs/names
 
     # Role and status
     role = db.Column(db.String(20), default='user', nullable=False)  # 'admin' or 'user'
@@ -34,7 +35,7 @@ class User(db.Model):
 
     # Relationships
     servers = db.relationship('Server', back_populates='creator', lazy='dynamic')
-    audit_logs = db.relationship('AuditLog', back_populates='user', lazy='dynamic')
+    audit_logs = db.relationship('AuditLog', back_populates='user', lazy='dynamic', cascade='all, delete-orphan')
 
     def set_password(self, password):
         """Hash and set password."""

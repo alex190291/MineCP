@@ -38,15 +38,24 @@ def create_user():
     """Create a user (admin only)."""
     user_id = get_jwt_identity()
     current_user = User.query.get(user_id)
-    admin_check = _require_admin(current_user)
-    if admin_check:
-        return admin_check
+    if not current_user or current_user.role != 'admin':
+        if not current_user or current_user.role != 'bootstrap':
+            return jsonify({'error': 'Forbidden'}), 403
 
     data = request.get_json() or {}
     required = ['username', 'email', 'role']
     for field in required:
         if field not in data:
             return jsonify({'error': f'Missing required field: {field}'}), 400
+
+    if current_user.role == 'bootstrap':
+        if User.query.filter_by(role='admin').first():
+            return jsonify({'error': 'Admin account already exists'}), 409
+        if data.get('role') != 'admin':
+            return jsonify({'error': 'Bootstrap can only create an admin account'}), 403
+    else:
+        if data.get('role') not in ['admin', 'user']:
+            return jsonify({'error': 'Invalid role'}), 400
 
     if User.query.filter_by(username=data['username']).first():
         return jsonify({'error': 'Username already exists'}), 409
@@ -60,6 +69,11 @@ def create_user():
         is_ldap_user=data.get('is_ldap_user', False),
         is_active=data.get('is_active', True),
     )
+
+    if current_user.role == 'bootstrap':
+        user.role = 'admin'
+        user.is_ldap_user = False
+        user.is_active = True
 
     if not user.is_ldap_user:
         password = data.get('password')
@@ -75,6 +89,19 @@ def create_user():
 
     db.session.add(user)
     db.session.commit()
+
+    # If bootstrap user created an admin, delete the bootstrap user and mark setup complete
+    if current_user.role == 'bootstrap':
+        from app.models.system_setup import SystemSetup
+        try:
+            db.session.delete(current_user)
+            db.session.commit()
+            SystemSetup.mark_setup_complete()
+        except Exception as e:
+            db.session.rollback()
+            # Log the error but don't fail the user creation
+            from flask import current_app as app
+            app.logger.error(f"Failed to delete bootstrap user: {e}")
 
     # Audit log user creation
     log_user_create(user.id, user.username)

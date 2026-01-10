@@ -10,9 +10,14 @@ import { GlassButton } from '@/components/common/GlassButton';
 interface PlayersTabProps {
   serverId: string;
   serverStatus: string;
+  canManage?: boolean;
 }
 
-export const PlayersTab: React.FC<PlayersTabProps> = ({ serverId, serverStatus }) => {
+export const PlayersTab: React.FC<PlayersTabProps> = ({
+  serverId,
+  serverStatus,
+  canManage = false,
+}) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
@@ -174,6 +179,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({ serverId, serverStatus }
                     loading={(opMutation.isPending || deopMutation.isPending) && selectedPlayer === player.username}
                     title={player.is_op ? t('players.actions.deop') : t('players.actions.op')}
                     className={player.is_op ? 'text-green-400 shadow-[0_0_10px_rgba(74,222,128,0.3)]' : ''}
+                    disabled={!canManage}
                   >
                     <Shield className={`w-4 h-4 ${player.is_op ? 'fill-green-400' : ''}`} />
                   </GlassButton>
@@ -188,6 +194,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({ serverId, serverStatus }
                       }}
                       loading={kickMutation.isPending && selectedPlayer === player.username}
                       title={t('players.actions.kick')}
+                      disabled={!canManage}
                     >
                       <UserX className="w-4 h-4" />
                     </GlassButton>
@@ -202,6 +209,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({ serverId, serverStatus }
                     }}
                     loading={banMutation.isPending && selectedPlayer === player.username}
                     title={t('players.actions.ban')}
+                    disabled={!canManage}
                   >
                     <Ban className="w-4 h-4" />
                   </GlassButton>
@@ -267,6 +275,7 @@ export const PlayersTab: React.FC<PlayersTabProps> = ({ serverId, serverStatus }
                   }}
                   loading={unbanMutation.isPending && selectedPlayer === playerName}
                   title={t('players.actions.unbanPlayer')}
+                  disabled={!canManage}
                 >
                   {t('players.actions.unban')}
                 </GlassButton>

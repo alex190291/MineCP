@@ -69,6 +69,11 @@ export const serversAPI = {
     return response.data;
   },
 
+  getPermissions: async (id: string): Promise<string[]> => {
+    const response = await apiClient.get<{ permissions: string[] }>(`/servers/${id}/permissions`);
+    return response.data.permissions;
+  },
+
   updateSettings: async (id: string, settings: Record<string, any>): Promise<{ settings: Record<string, any>; restart_required: boolean }> => {
     const response = await apiClient.put<{ settings: Record<string, any>; restart_required: boolean }>(
       `/servers/${id}/settings`,

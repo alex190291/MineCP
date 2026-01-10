@@ -8,10 +8,12 @@ import { serversAPI } from '@/api/servers';
 import { GlassCard } from '@/components/common/GlassCard';
 import { GlassButton } from '@/components/common/GlassButton';
 import { ServerCard } from '@/components/server/ServerCard';
+import { useAuthStore } from '@/store/authStore';
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const { data: servers, isLoading } = useQuery({
     queryKey: ['servers'],
@@ -30,13 +32,15 @@ export const Dashboard: React.FC = () => {
           <p className="text-white/60 mt-1">{t('dashboard.subtitle')}</p>
         </div>
 
-        <GlassButton
-          variant="primary"
-          onClick={() => navigate('/servers/new')}
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {t('nav.createServer')}
-        </GlassButton>
+        {user?.role === 'admin' && (
+          <GlassButton
+            variant="primary"
+            onClick={() => navigate('/servers/new')}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            {t('nav.createServer')}
+          </GlassButton>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -95,13 +99,15 @@ export const Dashboard: React.FC = () => {
               <ServerIcon className="w-16 h-16 text-white/20 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">{t('dashboard.noServers')}</h3>
               <p className="text-white/60 mb-4">{t('dashboard.noServersDesc')}</p>
-              <GlassButton
-                variant="primary"
-                onClick={() => navigate('/servers/new')}
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                {t('nav.createServer')}
-              </GlassButton>
+              {user?.role === 'admin' && (
+                <GlassButton
+                  variant="primary"
+                  onClick={() => navigate('/servers/new')}
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  {t('nav.createServer')}
+                </GlassButton>
+              )}
             </div>
           </GlassCard>
         )}

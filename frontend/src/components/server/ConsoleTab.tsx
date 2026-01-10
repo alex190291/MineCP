@@ -11,9 +11,14 @@ import { GlassInput } from '@/components/common/GlassInput';
 interface ConsoleTabProps {
   serverId: string;
   serverStatus: string;
+  canCommand?: boolean;
 }
 
-export const ConsoleTab: React.FC<ConsoleTabProps> = ({ serverId, serverStatus }) => {
+export const ConsoleTab: React.FC<ConsoleTabProps> = ({
+  serverId,
+  serverStatus,
+  canCommand = false,
+}) => {
   const { t } = useTranslation();
   const [command, setCommand] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -142,6 +147,10 @@ export const ConsoleTab: React.FC<ConsoleTabProps> = ({ serverId, serverStatus }
           {serverStatus !== 'running' ? (
             <div className="text-center py-4 text-white/60">
               {t('console.serverMustBeRunning')}
+            </div>
+          ) : !canCommand ? (
+            <div className="text-center py-4 text-white/60">
+              You don't have permission to send commands.
             </div>
           ) : (
             <>

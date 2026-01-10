@@ -24,4 +24,8 @@ export const authAPI = {
     });
     return response.data;
   },
+
+  completeSetup: async (): Promise<void> => {
+    await apiClient.post('/auth/complete-setup');
+  },
 };

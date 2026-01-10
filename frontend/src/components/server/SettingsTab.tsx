@@ -11,6 +11,7 @@ import { GlassInput } from '@/components/common/GlassInput';
 interface SettingsTabProps {
   serverId: string;
   serverStatus: string;
+  canEdit?: boolean;
 }
 
 interface SettingDefinition {
@@ -121,7 +122,11 @@ const COMMON_SETTINGS: SettingDefinition[] = [
   },
 ];
 
-export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus }) => {
+export const SettingsTab: React.FC<SettingsTabProps> = ({
+  serverId,
+  serverStatus,
+  canEdit = false,
+}) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<Record<string, any>>({});
@@ -152,6 +157,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus
   });
 
   const handleSettingChange = (key: string, value: any) => {
+    if (!canEdit) {
+      return;
+    }
     setSettings((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
@@ -167,6 +175,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus
               type="checkbox"
               checked={value === true || value === 'true'}
               onChange={(e) => handleSettingChange(setting.key, e.target.checked)}
+              disabled={!canEdit}
               className="w-4 h-4 rounded border-white/20 bg-white/10 text-blue-500 focus:ring-2 focus:ring-blue-500"
             />
             <span className="text-sm">{t('serverSettings.enabled')}</span>
@@ -178,6 +187,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus
           <select
             value={value || setting.default}
             onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+            disabled={!canEdit}
             className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all"
           >
             {setting.options?.map((option) => (
@@ -194,6 +204,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus
             type="number"
             value={value ?? setting.default}
             onChange={(e) => handleSettingChange(setting.key, parseInt(e.target.value))}
+            disabled={!canEdit}
           />
         );
 
@@ -204,6 +215,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus
             type="text"
             value={value ?? setting.default}
             onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+            disabled={!canEdit}
           />
         );
     }
@@ -240,7 +252,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus
             variant="primary"
             onClick={() => saveMutation.mutate()}
             loading={saveMutation.isPending}
-            disabled={!hasChanges}
+            disabled={!hasChanges || !canEdit}
           >
             <Save className="w-4 h-4 mr-2" />
             {t('serverSettings.saveChanges')}
@@ -268,7 +280,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ serverId, serverStatus
         </div>
       </GlassCard>
 
-      {hasChanges && (
+      {hasChanges && canEdit && (
         <div className="fixed bottom-6 right-6 z-50">
           <GlassCard className="bg-blue-500/20 border-blue-500/30">
             <div className="flex items-center gap-3">

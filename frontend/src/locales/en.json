@@ -21,6 +21,7 @@
     "dashboard": "Dashboard",
     "createServer": "Create Server",
     "users": "Users",
+    "roles": "Roles",
     "settings": "Settings",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar"

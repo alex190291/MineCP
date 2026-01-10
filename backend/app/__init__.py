@@ -48,6 +48,15 @@ def validate_security_config(app, config_name):
         else:
             warnings.append(msg)
 
+    # Check bootstrap password
+    bootstrap_password = app.config.get('BOOTSTRAP_PASSWORD', '')
+    if bootstrap_password == 'changeme':
+        msg = "BOOTSTRAP_PASSWORD is set to 'changeme'"
+        if config_name == 'production':
+            warnings.append(msg + " - update before provisioning admin account")
+        else:
+            warnings.append(msg)
+
     # Check encryption key
     encryption_key = app.config.get('ENCRYPTION_KEY')
     if not encryption_key:
@@ -164,6 +173,13 @@ def create_app(config_name=None):
 
     # Ensure database tables exist before starting background jobs
     init_database(app)
+    try:
+        from app.utils.permissions import seed_permissions_and_roles, ensure_creator_assignments
+        with app.app_context():
+            seed_permissions_and_roles()
+            ensure_creator_assignments()
+    except Exception as e:
+        app.logger.warning(f"Failed to seed roles/permissions: {e}")
 
     # Start background monitoring scheduler
     from app.background.monitoring_tasks import start_monitoring_scheduler
@@ -238,7 +254,7 @@ def init_database(app):
 
 def register_blueprints(app):
     """Register Flask blueprints."""
-    from app.api import auth, servers, monitoring, mods, backups, users, ldap_config, versions, files
+    from app.api import auth, servers, monitoring, mods, backups, users, ldap_config, versions, files, roles
 
     # Register API blueprints with /api prefix
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
@@ -250,6 +266,7 @@ def register_blueprints(app):
     app.register_blueprint(ldap_config.bp, url_prefix='/api/ldap')
     app.register_blueprint(versions.bp, url_prefix='/api/versions')
     app.register_blueprint(files.bp, url_prefix='/api')
+    app.register_blueprint(roles.bp, url_prefix='/api')
 
 
 def add_https_redirect(app):
@@ -332,7 +349,7 @@ def register_error_handlers(app):
 
 
 def create_default_admin():
-    """Create default admin user on first run only."""
+    """Create a bootstrap user on first run when no admin exists."""
     from app.models.user import User
     from app.models.system_setup import SystemSetup
     from flask import current_app
@@ -348,23 +365,22 @@ def create_default_admin():
             SystemSetup.mark_setup_complete()
             return
 
+        if User.query.filter_by(role='bootstrap').first():
+            return
+
         try:
-            admin = User(
-                username=current_app.config['DEFAULT_ADMIN_USERNAME'],
-                email=current_app.config['DEFAULT_ADMIN_EMAIL'],
-                role='admin',
+            bootstrap = User(
+                username=current_app.config['BOOTSTRAP_USERNAME'],
+                email=current_app.config['BOOTSTRAP_EMAIL'],
+                role='bootstrap',
                 is_ldap_user=False
             )
-            admin.set_password(current_app.config['DEFAULT_ADMIN_PASSWORD'])
-            db.session.add(admin)
+            bootstrap.set_password(current_app.config['BOOTSTRAP_PASSWORD'])
+            db.session.add(bootstrap)
             db.session.commit()
-            current_app.logger.info(f'Default admin user created: {admin.username}')
+            current_app.logger.info(f'Bootstrap user created: {bootstrap.username}')
         except IntegrityError:
             db.session.rollback()
 
-        try:
-            SystemSetup.mark_setup_complete()
-        except IntegrityError:
-            db.session.rollback()
     except OperationalError:
         pass

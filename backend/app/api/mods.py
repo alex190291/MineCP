@@ -19,6 +19,7 @@ from app.services.spigot_api import SpigotAPI
 from app.background.task_queue import get_task_queue
 from app.background.server_tasks import download_mod_async
 from app.utils.security import validate_download_url, validate_safe_path
+from app.utils.permissions import user_has_server_permission
 from app.utils.decorators import limit_content_length
 
 bp = Blueprint('mods', __name__)
@@ -28,7 +29,7 @@ def _require_server_access(user: User, server: Server):
         return jsonify({'error': 'Server not found'}), 404
     if not user:
         return jsonify({'error': 'Forbidden'}), 403
-    if user and user.role != 'admin' and server.created_by != user.id:
+    if not user_has_server_permission(user, server, 'server.mods.view'):
         return jsonify({'error': 'Forbidden'}), 403
     return None
 
@@ -162,6 +163,10 @@ def _map_server_type_to_loader(server_type):
 def upload_mod():
     """Upload a custom mod file."""
     import zipfile
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user or user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
 
     if 'file' not in request.files:
         return jsonify({'error': 'file required'}), 400
@@ -255,6 +260,9 @@ def install_mod(server_id):
     access_check = _require_server_access(user, server)
     if access_check:
         return access_check
+
+    if not user_has_server_permission(user, server, 'server.mods.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
 
     data = request.get_json() or {}
     mod_name = data.get('mod_name')
@@ -416,6 +424,9 @@ def delete_mod(server_id, mod_id):
     access_check = _require_server_access(user, server)
     if access_check:
         return access_check
+
+    if not user_has_server_permission(user, server, 'server.mods.manage'):
+        return jsonify({'error': 'Forbidden'}), 403
 
     mod = ServerMod.query.get(mod_id)
     if not mod or mod.server_id != server_id:
