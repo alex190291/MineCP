@@ -10,7 +10,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.server import Server
 from app.models.server_mod import ServerMod
 from app.models.user import User
@@ -18,6 +18,8 @@ from app.services.modrinth_api import ModrinthAPI
 from app.services.spigot_api import SpigotAPI
 from app.background.task_queue import get_task_queue
 from app.background.server_tasks import download_mod_async
+from app.utils.security import validate_download_url, validate_safe_path
+from app.utils.decorators import limit_content_length
 
 bp = Blueprint('mods', __name__)
 
@@ -109,8 +111,11 @@ def search_mods():
     )
 
     results = []
+    allowed_project_types = set(project_types or [])
     for result in modrinth_results:
-        content_type = result.get('project_type') or project_types[0]
+        content_type = result.get('project_type') or (project_types[0] if project_types else None)
+        if allowed_project_types and content_type not in allowed_project_types:
+            continue
         results.append({
             **result,
             'source': 'modrinth',
@@ -152,6 +157,8 @@ def _map_server_type_to_loader(server_type):
 
 @bp.route('/mods/upload', methods=['POST'])
 @jwt_required()
+@limiter.limit("10 per hour")
+@limit_content_length(500 * 1024 * 1024)  # 500MB for mod uploads
 def upload_mod():
     """Upload a custom mod file."""
     import zipfile
@@ -176,18 +183,38 @@ def upload_mod():
 
     # Validate the uploaded JAR file
     try:
+        MAX_UNCOMPRESSED_SIZE = 500 * 1024 * 1024  # 500MB
+        MAX_COMPRESSION_RATIO = 100  # Flag if compression ratio > 100:1
+
         with zipfile.ZipFile(file_path, 'r') as zip_file:
+            # Check total uncompressed size (ZIP bomb protection)
+            total_size = sum(info.file_size for info in zip_file.infolist())
+            if total_size > MAX_UNCOMPRESSED_SIZE:
+                file_path.unlink()
+                current_app.logger.warning(f"ZIP bomb attempt detected: uncompressed size {total_size} bytes")
+                return jsonify({'error': 'File too large when uncompressed'}), 400
+
+            # Check compression ratio for individual files (ZIP bomb protection)
+            for info in zip_file.infolist():
+                if info.compress_size > 0:
+                    ratio = info.file_size / info.compress_size
+                    if ratio > MAX_COMPRESSION_RATIO:
+                        file_path.unlink()
+                        current_app.logger.warning(f"ZIP bomb attempt detected: compression ratio {ratio:.1f}:1")
+                        return jsonify({'error': 'Suspicious compression detected'}), 400
+
             # Test the ZIP file integrity
             bad_file = zip_file.testzip()
             if bad_file is not None:
                 file_path.unlink()  # Delete corrupted file
-                return jsonify({'error': f'Corrupted JAR file: {bad_file}'}), 400
+                return jsonify({'error': 'Corrupted JAR file'}), 400
     except zipfile.BadZipFile:
         file_path.unlink()  # Delete invalid file
         return jsonify({'error': 'Invalid JAR file - not a valid ZIP archive'}), 400
     except Exception as e:
         file_path.unlink()  # Delete problematic file
-        return jsonify({'error': f'Failed to validate JAR file: {str(e)}'}), 400
+        current_app.logger.error(f'JAR validation failed: {str(e)}')
+        return jsonify({'error': 'Failed to validate JAR file'}), 400
 
     # Check minimum file size (1 KB)
     if file_path.stat().st_size < 1024:
@@ -218,6 +245,7 @@ def list_server_mods(server_id):
 
 @bp.route('/servers/<server_id>/mods', methods=['POST'])
 @jwt_required()
+@limiter.limit("20 per hour")
 def install_mod(server_id):
     """Install a mod on a server."""
     user_id = get_jwt_identity()
@@ -247,8 +275,17 @@ def install_mod(server_id):
     # Handle file upload
     if upload_path:
         upload_path = Path(upload_path)
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+
+        # Validate path is within upload folder (prevent path traversal)
+        is_valid, error_msg = validate_safe_path(upload_path, upload_folder)
+        if not is_valid:
+            current_app.logger.warning(f"Path traversal attempt blocked: {upload_path} - {error_msg}")
+            return jsonify({'error': 'Invalid file path', 'details': error_msg}), 400
+
         if not upload_path.exists():
             return jsonify({'error': 'Uploaded file not found'}), 404
+
         filename = upload_path.name
         destination = mods_dir / filename
         shutil.move(str(upload_path), destination)
@@ -351,6 +388,15 @@ def install_mod(server_id):
     db.session.add(mod_record)
     db.session.commit()
 
+    # Validate download URL to prevent SSRF attacks
+    is_valid, error_msg = validate_download_url(download_url)
+    if not is_valid:
+        # Rollback the database record
+        db.session.delete(mod_record)
+        db.session.commit()
+        current_app.logger.warning(f"SSRF attempt blocked: {download_url} - {error_msg}")
+        return jsonify({'error': 'Invalid download URL', 'details': error_msg}), 400
+
     # Queue download task
     task_queue = get_task_queue()
     task_queue.submit(download_mod_async, server.id, download_url, filename.replace('.jar', ''))
@@ -360,6 +406,7 @@ def install_mod(server_id):
 
 @bp.route('/servers/<server_id>/mods/<mod_id>', methods=['DELETE'])
 @jwt_required()
+@limiter.limit("30 per hour")
 def delete_mod(server_id, mod_id):
     """Remove a mod from a server."""
     user_id = get_jwt_identity()
@@ -375,6 +422,14 @@ def delete_mod(server_id, mod_id):
         return jsonify({'error': 'Mod not found'}), 404
 
     mod_path = Path(mod.file_path)
+
+    # Validate that the file path is within the server's directory (prevent arbitrary deletion)
+    server_base_dir = current_app.config['MC_SERVER_DATA_DIR'] / server_id
+    is_valid, error_msg = validate_safe_path(mod_path, server_base_dir)
+    if not is_valid:
+        current_app.logger.warning(f"Arbitrary file deletion attempt blocked: {mod_path} - {error_msg}")
+        return jsonify({'error': 'Invalid file path'}), 400
+
     if mod_path.exists():
         mod_path.unlink()
 

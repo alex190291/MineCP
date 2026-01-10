@@ -4,8 +4,10 @@ User management API endpoints.
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.user import User
+from app.utils.audit import log_user_create, log_user_delete, log_user_update, log_password_change
+from app.utils.security import validate_password_strength
 
 bp = Blueprint('users', __name__)
 
@@ -31,6 +33,7 @@ def list_users():
 
 @bp.route('', methods=['POST'])
 @jwt_required()
+@limiter.limit("20 per hour")
 def create_user():
     """Create a user (admin only)."""
     user_id = get_jwt_identity()
@@ -62,10 +65,19 @@ def create_user():
         password = data.get('password')
         if not password:
             return jsonify({'error': 'Password required for non-LDAP user'}), 400
+
+        # Validate password strength
+        is_valid, error_msg = validate_password_strength(password)
+        if not is_valid:
+            return jsonify({'error': error_msg}), 400
+
         user.set_password(password)
 
     db.session.add(user)
     db.session.commit()
+
+    # Audit log user creation
+    log_user_create(user.id, user.username)
 
     return jsonify(user.to_dict()), 201
 
@@ -89,6 +101,7 @@ def get_user(user_id):
 
 @bp.route('/<user_id>', methods=['PATCH'])
 @jwt_required()
+@limiter.limit("30 per hour")
 def update_user(user_id):
     """Update user details."""
     requester_id = get_jwt_identity()
@@ -102,26 +115,64 @@ def update_user(user_id):
         return jsonify({'error': 'Forbidden'}), 403
 
     data = request.get_json() or {}
+    fields_changed = []
 
-    for field in ['username', 'email', 'is_active']:
+    # Explicit field mapping with validation (prevent SQL injection via setattr)
+    ALLOWED_FIELDS = {
+        'username': lambda v: isinstance(v, str) and len(v) <= 100,
+        'email': lambda v: isinstance(v, str) and '@' in v and len(v) <= 255,
+        'is_active': lambda v: isinstance(v, bool),
+    }
+
+    ADMIN_ONLY_FIELDS = {
+        'role': lambda v: v in ['user', 'admin'],
+        'is_ldap_user': lambda v: isinstance(v, bool),
+    }
+
+    # Update allowed fields
+    for field, validator in ALLOWED_FIELDS.items():
         if field in data:
-            setattr(user, field, data[field])
+            value = data[field]
+            if not validator(value):
+                return jsonify({'error': f'Invalid value for field: {field}'}), 400
+            setattr(user, field, value)
+            fields_changed.append(field)
 
+    # Update admin-only fields
     if requester and requester.role == 'admin':
-        if 'role' in data:
-            user.role = data['role']
-        if 'is_ldap_user' in data:
-            user.is_ldap_user = data['is_ldap_user']
+        for field, validator in ADMIN_ONLY_FIELDS.items():
+            if field in data:
+                value = data[field]
+                if not validator(value):
+                    return jsonify({'error': f'Invalid value for field: {field}'}), 400
+                setattr(user, field, value)
+                fields_changed.append(field)
 
     if 'password' in data and not user.is_ldap_user:
-        user.set_password(data['password'])
+        password = data['password']
+
+        # Validate password strength
+        is_valid, error_msg = validate_password_strength(password)
+        if not is_valid:
+            return jsonify({'error': error_msg}), 400
+
+        user.set_password(password)
+        fields_changed.append('password')
+        # Audit log password change
+        log_password_change(requester_id, user.id)
 
     db.session.commit()
+
+    # Audit log user update
+    if fields_changed:
+        log_user_update(user.id, fields_changed)
+
     return jsonify(user.to_dict()), 200
 
 
 @bp.route('/<user_id>', methods=['DELETE'])
 @jwt_required()
+@limiter.limit("10 per hour")
 def delete_user(user_id):
     """Delete a user (admin only)."""
     requester_id = get_jwt_identity()
@@ -137,6 +188,14 @@ def delete_user(user_id):
     if user.id == requester_id:
         return jsonify({'error': 'Cannot delete your own account'}), 400
 
+    # Save user info before deletion
+    deleted_username = user.username
+    deleted_user_id = user.id
+
     db.session.delete(user)
     db.session.commit()
+
+    # Audit log user deletion
+    log_user_delete(deleted_user_id, deleted_username)
+
     return jsonify({'message': 'User deleted'}), 200

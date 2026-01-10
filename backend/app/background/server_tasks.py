@@ -77,11 +77,19 @@ def download_mod_async(server_id: str, mod_url: str, mod_name: str):
     app = create_app()
 
     with app.app_context():
+        from app.utils.security import validate_download_url
+
         file_path = None
         try:
             server = Server.query.get(server_id)
             if not server:
                 current_app.logger.error(f"Server {server_id} not found for mod download")
+                return
+
+            # Validate URL to prevent SSRF (defense in depth)
+            is_valid, error_msg = validate_download_url(mod_url)
+            if not is_valid:
+                current_app.logger.error(f"SSRF attempt in async download blocked: {mod_url} - {error_msg}")
                 return
 
             # Download file
@@ -93,6 +101,25 @@ def download_mod_async(server_id: str, mod_url: str, mod_name: str):
             )
             response.raise_for_status()
 
+            # Validate Content-Type (security: prevent downloading non-JAR files)
+            content_type = response.headers.get('Content-Type', '').lower()
+            allowed_types = [
+                'application/java-archive',
+                'application/zip',
+                'application/octet-stream',
+                'application/x-java-archive',
+            ]
+            if content_type and not any(allowed in content_type for allowed in allowed_types):
+                current_app.logger.warning(f"Invalid content type for mod download: {content_type}")
+                return
+
+            # Validate Content-Length before download (security: prevent huge downloads)
+            content_length = response.headers.get('Content-Length')
+            max_size = current_app.config.get('MAX_CONTENT_LENGTH', 524288000)  # 500MB default
+            if content_length and int(content_length) > max_size:
+                current_app.logger.warning(f"File too large: {content_length} bytes (max: {max_size})")
+                return
+
             # Save to server mods directory
             data_dir = current_app.config['MC_SERVER_DATA_DIR'] / server_id / 'data'
             if server.type and server.type.lower() in {'paper', 'spigot', 'purpur'}:
@@ -103,8 +130,18 @@ def download_mod_async(server_id: str, mod_url: str, mod_name: str):
 
             file_path = mods_dir / f"{mod_name}.jar"
 
+            # Track downloaded size during streaming (defense-in-depth)
+            downloaded_size = 0
+            max_size = current_app.config.get('MAX_CONTENT_LENGTH', 524288000)
+
             with open(file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
+                    downloaded_size += len(chunk)
+                    if downloaded_size > max_size:
+                        current_app.logger.warning(f"Download exceeded max size: {downloaded_size} bytes")
+                        if file_path.exists():
+                            file_path.unlink()
+                        return
                     f.write(chunk)
 
             # Validate the downloaded JAR file
@@ -137,6 +174,7 @@ def download_mod_async(server_id: str, mod_url: str, mod_name: str):
 def _validate_jar_file(file_path) -> bool:
     """
     Validate that a file is a valid JAR (ZIP) file.
+    Includes ZIP bomb protection.
 
     Args:
         file_path: Path to the file to validate
@@ -146,6 +184,7 @@ def _validate_jar_file(file_path) -> bool:
     """
     import zipfile
     from pathlib import Path
+    from flask import current_app
 
     file_path = Path(file_path)
 
@@ -157,9 +196,27 @@ def _validate_jar_file(file_path) -> bool:
     if file_path.stat().st_size < 1024:
         return False
 
+    # ZIP bomb protection constants
+    MAX_UNCOMPRESSED_SIZE = 500 * 1024 * 1024  # 500MB
+    MAX_COMPRESSION_RATIO = 100  # Flag if compression ratio > 100:1
+
     # Try to open as ZIP file
     try:
         with zipfile.ZipFile(file_path, 'r') as zip_file:
+            # Check total uncompressed size (ZIP bomb protection)
+            total_size = sum(info.file_size for info in zip_file.infolist())
+            if total_size > MAX_UNCOMPRESSED_SIZE:
+                current_app.logger.warning(f"ZIP bomb detected: uncompressed size {total_size} bytes")
+                return False
+
+            # Check compression ratio for individual files (ZIP bomb protection)
+            for info in zip_file.infolist():
+                if info.compress_size > 0:
+                    ratio = info.file_size / info.compress_size
+                    if ratio > MAX_COMPRESSION_RATIO:
+                        current_app.logger.warning(f"ZIP bomb detected: compression ratio {ratio:.1f}:1")
+                        return False
+
             # Test the ZIP file integrity
             bad_file = zip_file.testzip()
             return bad_file is None

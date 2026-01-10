@@ -5,12 +5,13 @@ import secrets
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.server import Server
 from app.models.user import User
 from app.services.docker_manager import DockerManager
 from app.background.task_queue import get_task_queue
 from app.background.server_tasks import deploy_server_async
+from app.utils.audit import log_server_create, log_server_delete, log_server_start, log_server_stop
 
 bp = Blueprint('servers', __name__)
 
@@ -52,6 +53,7 @@ def list_servers():
 
 @bp.route('', methods=['POST'])
 @jwt_required()
+@limiter.limit("10 per hour")
 def create_server():
     """Create a new server."""
     user_id = get_jwt_identity()
@@ -89,6 +91,9 @@ def create_server():
     db.session.add(server)
     db.session.commit()
 
+    # Audit log server creation
+    log_server_create(server.id, server.name)
+
     task_queue = get_task_queue()
     task_queue.submit(deploy_server_async, server.id)
 
@@ -114,6 +119,7 @@ def get_server(server_id):
 
 @bp.route('/<server_id>', methods=['PATCH'])
 @jwt_required()
+@limiter.limit("30 per hour")
 def update_server(server_id):
     """Update server configuration."""
     user_id = get_jwt_identity()
@@ -143,6 +149,7 @@ def update_server(server_id):
 
 @bp.route('/<server_id>', methods=['DELETE'])
 @jwt_required()
+@limiter.limit("10 per hour")
 def delete_server(server_id):
     """Delete a server."""
     user_id = get_jwt_identity()
@@ -155,6 +162,10 @@ def delete_server(server_id):
     if user and user.role != 'admin' and server.created_by != user_id:
         return jsonify({'error': 'Forbidden'}), 403
 
+    # Audit log before deletion
+    server_name = server.name
+    server_id_for_log = server.id
+
     if server.container_id:
         docker_manager = DockerManager()
         docker_manager.delete_server(server.container_id, remove_volumes=True)
@@ -162,11 +173,15 @@ def delete_server(server_id):
     db.session.delete(server)
     db.session.commit()
 
+    # Audit log server deletion
+    log_server_delete(server_id_for_log, server_name)
+
     return jsonify({'message': 'Server deleted'}), 200
 
 
 @bp.route('/<server_id>/start', methods=['POST'])
 @jwt_required()
+@limiter.limit("20 per hour")
 def start_server(server_id):
     """Start a server."""
     user_id = get_jwt_identity()
@@ -192,11 +207,16 @@ def start_server(server_id):
         server.status = 'starting'
 
     db.session.commit()
+
+    # Audit log server start
+    log_server_start(server.id)
+
     return jsonify(server.to_dict()), 200
 
 
 @bp.route('/<server_id>/stop', methods=['POST'])
 @jwt_required()
+@limiter.limit("20 per hour")
 def stop_server(server_id):
     """Stop a server."""
     user_id = get_jwt_identity()
@@ -220,11 +240,15 @@ def stop_server(server_id):
     server.status = 'stopped'
     db.session.commit()
 
+    # Audit log server stop
+    log_server_stop(server.id)
+
     return jsonify(server.to_dict()), 200
 
 
 @bp.route('/<server_id>/restart', methods=['POST'])
 @jwt_required()
+@limiter.limit("20 per hour")
 def restart_server(server_id):
     """Restart a server."""
     user_id = get_jwt_identity()
@@ -280,6 +304,7 @@ def get_server_logs(server_id):
 
 @bp.route('/<server_id>/command', methods=['POST'])
 @jwt_required()
+@limiter.limit("60 per minute")
 def send_server_command(server_id):
     """Send a command to the server via RCON."""
     from app.services.rcon_client import execute_rcon_command
@@ -340,6 +365,7 @@ def get_server_settings(server_id):
 
 @bp.route('/<server_id>/settings', methods=['PUT'])
 @jwt_required()
+@limiter.limit("30 per hour")
 def update_server_settings(server_id):
     """Update server.properties."""
     user_id = get_jwt_identity()

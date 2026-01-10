@@ -13,8 +13,17 @@ LOGS_DIR = BASE_DIR / 'logs'
 class Config:
     """Base configuration."""
 
+    # Application
+    APP_NAME = os.getenv('APP_NAME', 'Minecraft Server Manager')
+
     # Flask
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+    # Encryption for sensitive data (RCON passwords, LDAP bind passwords)
+    ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', None)
+
+    # Redis (optional - for token blacklist, falls back to in-memory)
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
     # Database
     SQLALCHEMY_DATABASE_URI = os.getenv(

@@ -28,6 +28,10 @@ schedule==1.2.0
 # Utilities
 python-dotenv==1.0.0
 requests==2.31.0
+cryptography==42.0.0
+redis==5.0.1
+pyotp==2.9.0
+qrcode==7.4.2
 
 # Rate Limiting
 Flask-Limiter==3.5.0

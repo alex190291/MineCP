@@ -23,6 +23,11 @@ class User(db.Model):
     role = db.Column(db.String(20), default='user', nullable=False)  # 'admin' or 'user'
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 
+    # Two-Factor Authentication
+    totp_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
+    totp_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    backup_codes = db.Column(db.Text, nullable=True)  # JSON array of hashed backup codes
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     last_login = db.Column(db.DateTime, nullable=True)
@@ -50,6 +55,7 @@ class User(db.Model):
             'role': self.role,
             'is_ldap_user': self.is_ldap_user,
             'is_active': self.is_active,
+            'totp_enabled': self.totp_enabled,
             'created_at': self.created_at.isoformat(),
             'last_login': self.last_login.isoformat() if self.last_login else None
         }

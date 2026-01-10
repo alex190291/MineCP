@@ -5,7 +5,7 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.backup import Backup
 from app.models.server import Server
 from app.models.user import User
@@ -56,6 +56,7 @@ def list_server_backups(server_id):
 
 @bp.route('/servers/<server_id>/backups', methods=['POST'])
 @jwt_required()
+@limiter.limit("10 per hour")
 def create_backup(server_id):
     """Create a backup for a server."""
     user_id = get_jwt_identity()
@@ -109,6 +110,7 @@ def create_backup(server_id):
 
 @bp.route('/backups/<backup_id>/restore', methods=['POST'])
 @jwt_required()
+@limiter.limit("5 per hour")
 def restore_backup(backup_id):
     """Restore a backup."""
     user_id = get_jwt_identity()
@@ -137,6 +139,7 @@ def restore_backup(backup_id):
 
 @bp.route('/backups/<backup_id>', methods=['DELETE'])
 @jwt_required()
+@limiter.limit("20 per hour")
 def delete_backup(backup_id):
     """Delete a backup."""
     user_id = get_jwt_identity()

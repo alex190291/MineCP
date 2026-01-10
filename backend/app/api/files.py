@@ -7,9 +7,10 @@ from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.server import Server
 from app.models.user import User
+from app.utils.decorators import limit_content_length
 
 bp = Blueprint('files', __name__)
 
@@ -162,6 +163,8 @@ def read_file(server_id):
 
 @bp.route('/servers/<server_id>/files/write', methods=['POST'])
 @jwt_required()
+@limiter.limit("60 per hour")
+@limit_content_length(10 * 1024 * 1024)  # 10MB for config file writes
 def write_file(server_id):
     """
     Write content to a file.
@@ -209,6 +212,7 @@ def write_file(server_id):
 
 @bp.route('/servers/<server_id>/files/delete', methods=['DELETE'])
 @jwt_required()
+@limiter.limit("60 per hour")
 def delete_file(server_id):
     """
     Delete a file or directory.
@@ -260,6 +264,8 @@ def delete_file(server_id):
 
 @bp.route('/servers/<server_id>/files/upload', methods=['POST'])
 @jwt_required()
+@limiter.limit("30 per hour")
+@limit_content_length(100 * 1024 * 1024)  # 100MB for file uploads
 def upload_file(server_id):
     """
     Upload a file to server directory.
@@ -283,6 +289,28 @@ def upload_file(server_id):
 
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
+
+    # Validate file extension (whitelist approach)
+    filename = secure_filename(file.filename)
+    allowed_extensions = {
+        # Config files
+        '.properties', '.yml', '.yaml', '.json', '.toml', '.conf', '.cfg',
+        # Text files
+        '.txt', '.log',
+        # Java/Minecraft files
+        '.jar',
+        # World/data files
+        '.dat', '.mca', '.mcr',
+        # Other common files
+        '.png', '.jpg', '.jpeg'
+    }
+
+    file_ext = Path(filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        return jsonify({
+            'error': f'File type not allowed: {file_ext}',
+            'allowed_types': list(allowed_extensions)
+        }), 400
 
     # Get target directory
     relative_path = request.form.get('path', '')

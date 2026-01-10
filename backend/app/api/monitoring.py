@@ -345,7 +345,7 @@ def unban_player(server_id):
 
     except Exception as e:
         current_app.logger.error(f"Exception during unban: {e}")
-        return jsonify({'error': f'Unban failed: {str(e)}'}), 500
+        return jsonify({'error': 'Unban operation failed'}), 500
 
 
 @bp.route('/servers/<server_id>/players/op', methods=['POST'])

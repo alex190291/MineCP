@@ -1,18 +1,25 @@
 """
 Authentication API endpoints.
 """
+import json
+import io
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
     jwt_required,
-    get_jwt_identity
+    get_jwt_identity,
+    get_jwt
 )
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+import pyotp
+import qrcode
 
 from app.extensions import db, limiter
 from app.models.ldap_config import LDAPConfig
 from app.models.user import User
+from app.utils.audit import log_login, log_logout
 
 bp = Blueprint('auth', __name__)
 
@@ -45,11 +52,70 @@ def login():
         if not user.is_active:
             return jsonify({'error': 'Account is disabled'}), 403
 
+        # Check if user is using default admin credentials - require password change
+        from flask import current_app
+        default_admin_username = current_app.config.get('DEFAULT_ADMIN_USERNAME', 'admin')
+        default_admin_password = current_app.config.get('DEFAULT_ADMIN_PASSWORD', 'changeme')
+
+        if (user.username == default_admin_username and
+            password == default_admin_password and
+            user.role == 'admin'):
+            return jsonify({
+                'error': 'Default password must be changed',
+                'message': 'You are using the default administrator password. For security reasons, you must change your password before accessing the system.',
+                'require_password_change': True,
+                'user_id': user.id
+            }), 403
+
+        # Check if 2FA is enabled for this user
+        if user.totp_enabled:
+            totp_code = data.get('totp_code')
+            backup_code = data.get('backup_code')
+
+            if not totp_code and not backup_code:
+                return jsonify({
+                    'error': '2FA required',
+                    'message': 'Please provide your 6-digit 2FA code or a backup code',
+                    'require_2fa': True,
+                    'user_id': user.id
+                }), 401
+
+            # Verify TOTP code
+            if totp_code:
+                totp = pyotp.TOTP(user.totp_secret)
+                if not totp.verify(totp_code, valid_window=1):
+                    log_login(user.id, success=False, details={'method': 'local', 'username': username, 'reason': 'invalid_2fa_code'})
+                    return jsonify({'error': 'Invalid 2FA code'}), 401
+
+            # Verify backup code
+            elif backup_code:
+                if not user.backup_codes:
+                    return jsonify({'error': 'No backup codes available'}), 401
+
+                backup_codes = json.loads(user.backup_codes)
+                backup_code_valid = False
+
+                for idx, hashed_code in enumerate(backup_codes):
+                    if check_password_hash(hashed_code, backup_code):
+                        backup_code_valid = True
+                        # Remove used backup code
+                        backup_codes.pop(idx)
+                        user.backup_codes = json.dumps(backup_codes)
+                        db.session.commit()
+                        break
+
+                if not backup_code_valid:
+                    log_login(user.id, success=False, details={'method': 'local', 'username': username, 'reason': 'invalid_backup_code'})
+                    return jsonify({'error': 'Invalid backup code'}), 401
+
         user.last_login = datetime.utcnow()
         db.session.commit()
 
         access_token = create_access_token(identity=user.id)
         refresh_token = create_refresh_token(identity=user.id)
+
+        # Audit log successful login
+        log_login(user.id, success=True, details={'method': 'local', 'username': username, '2fa_used': user.totp_enabled})
 
         return jsonify({
             'access_token': access_token,
@@ -101,11 +167,17 @@ def login():
         access_token = create_access_token(identity=user.id)
         refresh_token = create_refresh_token(identity=user.id)
 
+        # Audit log successful LDAP login
+        log_login(user.id, success=True, details={'method': 'ldap', 'username': username})
+
         return jsonify({
             'access_token': access_token,
             'refresh_token': refresh_token,
             'user': user.to_dict()
         }), 200
+
+    # Audit log failed login attempt
+    log_login(None, success=False, details={'username': username, 'reason': 'invalid_credentials'})
 
     return jsonify({'error': 'Invalid credentials'}), 401
 
@@ -508,11 +580,273 @@ def get_current_user():
 @jwt_required()
 def logout():
     """
-    Logout user (client should discard tokens).
+    Logout user (revoke JWT token).
     ---
     POST /api/auth/logout
     Authorization: Bearer <access_token>
     """
-    # In a production system, you'd add the token to a blacklist
-    # For now, client-side token removal is sufficient
+    from app.utils.token_blacklist import get_blacklist
+    from flask import current_app
+
+    user_id = get_jwt_identity()
+    jwt_data = get_jwt()
+    jti = jwt_data["jti"]
+    exp_timestamp = jwt_data["exp"]
+
+    # Calculate time until token expires
+    now_timestamp = datetime.utcnow().timestamp()
+    expires_in = int(exp_timestamp - now_timestamp)
+
+    if expires_in > 0:
+        # Add token to blacklist
+        blacklist = get_blacklist()
+        blacklist.add_token(jti, expires_in)
+        current_app.logger.info(f"Token {jti} blacklisted for user {user_id}")
+
+    # Audit log logout
+    log_logout(user_id)
+
     return jsonify({'message': 'Logged out successfully'}), 200
+
+
+@bp.route('/2fa/setup', methods=['POST'])
+@jwt_required()
+@limiter.limit("5 per hour")
+def setup_2fa():
+    """
+    Generate a new TOTP secret and QR code for 2FA setup.
+    Does not enable 2FA until verified via /2fa/enable.
+    ---
+    POST /api/auth/2fa/setup
+    Authorization: Bearer <access_token>
+    """
+    from flask import current_app
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.is_ldap_user:
+        return jsonify({'error': '2FA setup not available for LDAP users'}), 400
+
+    # Generate a new TOTP secret
+    secret = pyotp.random_base32()
+
+    # Create provisioning URI for QR code
+    # Format: otpauth://totp/ServiceName:username?secret=SECRET&issuer=ServiceName
+    app_name = current_app.config.get('APP_NAME', 'Minecraft Manager')
+    provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=user.username,
+        issuer_name=app_name
+    )
+
+    # Generate QR code
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(provisioning_uri)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    # Convert to base64 for easy transmission
+    img_buffer = io.BytesIO()
+    img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    import base64
+    qr_code_base64 = base64.b64encode(img_buffer.read()).decode('utf-8')
+
+    # Store secret temporarily (not enabled yet)
+    user.totp_secret = secret
+    db.session.commit()
+
+    return jsonify({
+        'secret': secret,
+        'qr_code': f'data:image/png;base64,{qr_code_base64}',
+        'provisioning_uri': provisioning_uri,
+        'message': 'Scan the QR code with your authenticator app, then verify with /2fa/enable'
+    }), 200
+
+
+@bp.route('/2fa/enable', methods=['POST'])
+@jwt_required()
+@limiter.limit("10 per hour")
+def enable_2fa():
+    """
+    Verify TOTP code and enable 2FA for the user.
+    Also generates backup codes.
+    ---
+    POST /api/auth/2fa/enable
+    Authorization: Bearer <access_token>
+    Body: {"totp_code": "123456"}
+    """
+    import secrets
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.is_ldap_user:
+        return jsonify({'error': '2FA not available for LDAP users'}), 400
+
+    if not user.totp_secret:
+        return jsonify({'error': 'Please run /2fa/setup first'}), 400
+
+    if user.totp_enabled:
+        return jsonify({'error': '2FA is already enabled'}), 400
+
+    data = request.get_json() or {}
+    totp_code = data.get('totp_code')
+
+    if not totp_code:
+        return jsonify({'error': 'totp_code required'}), 400
+
+    # Verify the TOTP code
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(totp_code, valid_window=1):
+        return jsonify({'error': 'Invalid TOTP code'}), 401
+
+    # Generate backup codes
+    backup_codes = []
+    backup_codes_hashed = []
+
+    for _ in range(10):
+        # Generate 8-character alphanumeric backup codes
+        code = ''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+        backup_codes.append(code)
+        backup_codes_hashed.append(generate_password_hash(code))
+
+    # Enable 2FA
+    user.totp_enabled = True
+    user.backup_codes = json.dumps(backup_codes_hashed)
+    db.session.commit()
+
+    return jsonify({
+        'message': '2FA enabled successfully',
+        'backup_codes': backup_codes,
+        'warning': 'Save these backup codes in a secure location. They will not be shown again.'
+    }), 200
+
+
+@bp.route('/2fa/disable', methods=['POST'])
+@jwt_required()
+@limiter.limit("10 per hour")
+def disable_2fa():
+    """
+    Disable 2FA for the user.
+    Requires current password for security.
+    ---
+    POST /api/auth/2fa/disable
+    Authorization: Bearer <access_token>
+    Body: {"password": "current_password"}
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if not user.totp_enabled:
+        return jsonify({'error': '2FA is not enabled'}), 400
+
+    data = request.get_json() or {}
+    password = data.get('password')
+
+    if not password:
+        return jsonify({'error': 'Password required to disable 2FA'}), 400
+
+    # Verify current password
+    if not user.check_password(password):
+        return jsonify({'error': 'Invalid password'}), 401
+
+    # Disable 2FA
+    user.totp_enabled = False
+    user.totp_secret = None
+    user.backup_codes = None
+    db.session.commit()
+
+    return jsonify({'message': '2FA disabled successfully'}), 200
+
+
+@bp.route('/2fa/status', methods=['GET'])
+@jwt_required()
+def get_2fa_status():
+    """
+    Get 2FA status for current user.
+    ---
+    GET /api/auth/2fa/status
+    Authorization: Bearer <access_token>
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    backup_codes_count = 0
+    if user.backup_codes:
+        try:
+            backup_codes_count = len(json.loads(user.backup_codes))
+        except:
+            pass
+
+    return jsonify({
+        'enabled': user.totp_enabled,
+        'is_ldap_user': user.is_ldap_user,
+        'backup_codes_remaining': backup_codes_count if user.totp_enabled else None
+    }), 200
+
+
+@bp.route('/2fa/regenerate-backup-codes', methods=['POST'])
+@jwt_required()
+@limiter.limit("5 per hour")
+def regenerate_backup_codes():
+    """
+    Regenerate backup codes for 2FA.
+    Requires TOTP code verification.
+    ---
+    POST /api/auth/2fa/regenerate-backup-codes
+    Authorization: Bearer <access_token>
+    Body: {"totp_code": "123456"}
+    """
+    import secrets
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if not user.totp_enabled:
+        return jsonify({'error': '2FA is not enabled'}), 400
+
+    data = request.get_json() or {}
+    totp_code = data.get('totp_code')
+
+    if not totp_code:
+        return jsonify({'error': 'totp_code required'}), 400
+
+    # Verify the TOTP code
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(totp_code, valid_window=1):
+        return jsonify({'error': 'Invalid TOTP code'}), 401
+
+    # Generate new backup codes
+    backup_codes = []
+    backup_codes_hashed = []
+
+    for _ in range(10):
+        code = ''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+        backup_codes.append(code)
+        backup_codes_hashed.append(generate_password_hash(code))
+
+    user.backup_codes = json.dumps(backup_codes_hashed)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Backup codes regenerated successfully',
+        'backup_codes': backup_codes,
+        'warning': 'Save these backup codes in a secure location. They will not be shown again.'
+    }), 200
