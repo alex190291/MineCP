@@ -351,28 +351,39 @@ def register_error_handlers(app):
 def create_default_admin():
     """Create a bootstrap user on first run when no admin exists."""
     from app.models.user import User
+    from app.models.role import Role
     from app.models.system_setup import SystemSetup
     from flask import current_app
     from sqlalchemy.exc import OperationalError, IntegrityError
 
     try:
         if not SystemSetup.is_first_run():
-            if User.query.filter_by(role='admin').count() == 0:
+            # Check if any admin users exist
+            admin_role = Role.query.filter_by(name='admin').first()
+            if admin_role and User.query.filter_by(role_id=admin_role.id).count() == 0:
                 current_app.logger.warning('No admin users exist')
             return
 
-        if User.query.filter_by(role='admin').first():
+        # Check if admin already exists
+        admin_role = Role.query.filter_by(name='admin').first()
+        if admin_role and User.query.filter_by(role_id=admin_role.id).first():
             SystemSetup.mark_setup_complete()
             return
 
-        if User.query.filter_by(role='bootstrap').first():
+        # Check if bootstrap user already exists
+        bootstrap_role = Role.query.filter_by(name='bootstrap').first()
+        if not bootstrap_role:
+            current_app.logger.warning('Bootstrap role not found - skipping bootstrap user creation')
+            return
+
+        if User.query.filter_by(role_id=bootstrap_role.id).first():
             return
 
         try:
             bootstrap = User(
                 username=current_app.config['BOOTSTRAP_USERNAME'],
                 email=current_app.config['BOOTSTRAP_EMAIL'],
-                role='bootstrap',
+                role_id=bootstrap_role.id,
                 is_ldap_user=False
             )
             bootstrap.set_password(current_app.config['BOOTSTRAP_PASSWORD'])

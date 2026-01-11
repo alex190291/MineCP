@@ -19,9 +19,29 @@ import qrcode
 from app.extensions import db, limiter
 from app.models.ldap_config import LDAPConfig
 from app.models.user import User
+from app.models.role import Role
 from app.utils.audit import log_login, log_logout
 
 bp = Blueprint('auth', __name__)
+
+
+def entry_attr_values(entry, attr: str):
+    """Extract attribute values from LDAP entry."""
+    if not entry:
+        return []
+    attrs = entry.entry_attributes_as_dict
+    if attr not in attrs:
+        return []
+    value = attrs.get(attr)
+    if isinstance(value, (list, tuple, set)):
+        return [str(v) for v in value]
+    return [str(value)]
+
+
+def get_role_id_by_name(role_name: str) -> str | None:
+    """Get role ID from role name. Returns None if role not found."""
+    role = Role.query.filter_by(name=role_name).first()
+    return role.id if role else None
 
 
 @bp.route('/login', methods=['POST'])
@@ -146,10 +166,11 @@ def login():
 
         if not user:
             resolved_username = ldap_result.get('username') or username
+            role_id = get_role_id_by_name(ldap_role)
             user = User(
                 username=resolved_username,
                 email=ldap_result.get('email') or f"{username}@ldap.local",
-                role=ldap_role,
+                role_id=role_id,
                 is_ldap_user=True,
                 ldap_dn=ldap_result.get('dn'),
                 is_active=True
@@ -159,7 +180,8 @@ def login():
             # Update existing user with LDAP info and role
             user.is_ldap_user = True
             user.ldap_dn = ldap_result.get('dn')
-            user.role = ldap_role  # Update role based on current LDAP groups
+            role_id = get_role_id_by_name(ldap_role)
+            user.role_id = role_id  # Update role based on current LDAP groups
             if ldap_result.get('email'):
                 user.email = ldap_result['email']
         if ldap_groups:
@@ -330,17 +352,6 @@ def _ldap_authenticate(username: str, password: str):
 
     def is_dn_template(value: str) -> bool:
         return bool(value and not value.startswith('(') and '=' in value and ',' in value)
-
-    def entry_attr_values(entry, attr: str):
-        if not entry:
-            return []
-        attrs = entry.entry_attributes_as_dict
-        if attr not in attrs:
-            return []
-        value = attrs.get(attr)
-        if isinstance(value, (list, tuple, set)):
-            return [str(v) for v in value]
-        return [str(value)]
 
     def parse_ldap_bool(value) -> bool:
         if value is None:
